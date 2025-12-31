@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from argus.core import COCODataset, Dataset, YOLODataset
@@ -85,6 +86,108 @@ def list_datasets(
 
     console.print(table)
     console.print(f"\n[green]Found {len(datasets)} dataset(s)[/green]")
+
+
+@app.command(name="stats")
+def stats(
+    dataset_path: Annotated[
+        Path,
+        typer.Option(
+            "--dataset-path",
+            "-d",
+            help="Path to the dataset root directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Show instance statistics for a dataset.
+
+    Displays the number of annotation instances per class, per split.
+    The path should point to a dataset root containing data.yaml (YOLO)
+    or an annotations/ folder (COCO).
+    """
+    # Resolve path and validate
+    dataset_path = dataset_path.resolve()
+    if not dataset_path.exists():
+        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
+        raise typer.Exit(1)
+    if not dataset_path.is_dir():
+        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
+        raise typer.Exit(1)
+
+    # Detect dataset
+    dataset = _detect_dataset(dataset_path)
+    if not dataset:
+        console.print(
+            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            "[yellow]Ensure the path points to a dataset root containing "
+            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Get instance counts with progress indicator
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        progress.add_task("Analyzing dataset...", total=None)
+        counts = dataset.get_instance_counts()
+
+    if not counts:
+        console.print("[yellow]No annotations found in the dataset.[/yellow]")
+        return
+
+    # Collect all classes and splits
+    all_classes: set[str] = set()
+    all_splits: list[str] = []
+    for split, class_counts in counts.items():
+        all_splits.append(split)
+        all_classes.update(class_counts.keys())
+
+    # Sort splits in standard order
+    split_order = {"train": 0, "val": 1, "test": 2}
+    all_splits.sort(key=lambda s: split_order.get(s, 99))
+
+    # Sort classes alphabetically
+    sorted_classes = sorted(all_classes)
+
+    # Create table
+    table = Table(title=f"Instance Statistics: {dataset_path.name} ({dataset.format.value})")
+    table.add_column("Class", style="cyan")
+    for split in all_splits:
+        table.add_column(split, justify="right", style="green")
+    table.add_column("Total", justify="right", style="yellow bold")
+
+    # Add rows for each class
+    grand_totals = {split: 0 for split in all_splits}
+    grand_total = 0
+
+    for class_name in sorted_classes:
+        row = [class_name]
+        class_total = 0
+        for split in all_splits:
+            count = counts.get(split, {}).get(class_name, 0)
+            row.append(str(count) if count > 0 else "-")
+            class_total += count
+            grand_totals[split] += count
+        row.append(str(class_total))
+        grand_total += class_total
+        table.add_row(*row)
+
+    # Add totals row
+    table.add_section()
+    totals_row = ["[bold]Total[/bold]"]
+    for split in all_splits:
+        totals_row.append(f"[bold]{grand_totals[split]}[/bold]")
+    totals_row.append(f"[bold]{grand_total}[/bold]")
+    table.add_row(*totals_row)
+
+    console.print(table)
+    console.print(f"\n[green]Dataset: {dataset.format.value.upper()} | "
+                  f"Task: {dataset.task.value} | "
+                  f"Classes: {len(sorted_classes)} | "
+                  f"Total instances: {grand_total}[/green]")
 
 
 def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:

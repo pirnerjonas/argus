@@ -160,6 +160,70 @@ class COCODataset(Dataset):
         except (json.JSONDecodeError, OSError):
             return None
 
+    def get_instance_counts(self) -> dict[str, dict[str, int]]:
+        """Get the number of annotation instances per class, per split.
+
+        Parses all annotation JSON files and counts category_id occurrences.
+
+        Returns:
+            Dictionary mapping split name to dict of class name to instance count.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                # Build category_id -> name mapping
+                categories = data.get("categories", [])
+                id_to_name: dict[int, str] = {}
+                for cat in categories:
+                    if isinstance(cat, dict) and "id" in cat and "name" in cat:
+                        id_to_name[cat["id"]] = cat["name"]
+
+                # Determine split from filename
+                split = self._get_split_from_filename(ann_file.stem)
+
+                # Count annotations per category
+                split_counts: dict[str, int] = counts.get(split, {})
+                annotations = data.get("annotations", [])
+
+                for ann in annotations:
+                    if isinstance(ann, dict) and "category_id" in ann:
+                        cat_id = ann["category_id"]
+                        class_name = id_to_name.get(cat_id, f"class_{cat_id}")
+                        split_counts[class_name] = split_counts.get(class_name, 0) + 1
+
+                counts[split] = split_counts
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return counts
+
+    @staticmethod
+    def _get_split_from_filename(filename: str) -> str:
+        """Extract split name from annotation filename.
+
+        Args:
+            filename: Annotation file stem (without extension).
+
+        Returns:
+            Split name (train, val, test) or 'train' as default.
+        """
+        name_lower = filename.lower()
+        if "train" in name_lower:
+            return "train"
+        elif "val" in name_lower:
+            return "val"
+        elif "test" in name_lower:
+            return "test"
+        return "train"
+
     @classmethod
     def _determine_task_type(cls, annotations: list) -> TaskType:
         """Determine task type from annotations.
