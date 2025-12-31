@@ -103,6 +103,63 @@ class YOLODataset(Dataset):
 
         return None
 
+    def get_instance_counts(self) -> dict[str, dict[str, int]]:
+        """Get the number of annotation instances per class, per split.
+
+        Parses all label files in labels/{split}/*.txt and counts
+        occurrences of each class ID. For unsplit datasets, uses "unsplit"
+        as the split name.
+
+        Returns:
+            Dictionary mapping split name to dict of class name to instance count.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        # Build class_id -> class_name mapping
+        id_to_name = {i: name for i, name in enumerate(self.class_names)}
+
+        # Determine splits to process - use "unsplit" for flat structure
+        splits_to_process = self.splits if self.splits else ["unsplit"]
+
+        # Get label directories for each split
+        for split in splits_to_process:
+            split_counts: dict[str, int] = {}
+
+            # Find label directory for this split
+            if split == "unsplit":
+                label_dir = self.path / "labels"
+            else:
+                label_dir = self.path / "labels" / split
+                if not label_dir.is_dir():
+                    # Fallback to flat structure
+                    label_dir = self.path / "labels"
+
+            if not label_dir.is_dir():
+                continue
+
+            # Parse all label files
+            for txt_file in label_dir.glob("*.txt"):
+                try:
+                    with open(txt_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            parts = line.split()
+                            if len(parts) >= 5:  # Valid annotation line
+                                try:
+                                    class_id = int(parts[0])
+                                    class_name = id_to_name.get(class_id, f"class_{class_id}")
+                                    split_counts[class_name] = split_counts.get(class_name, 0) + 1
+                                except ValueError:
+                                    continue
+                except OSError:
+                    continue
+
+            counts[split] = split_counts
+
+        return counts
+
     @classmethod
     def _detect_splits(cls, path: Path, config: dict) -> list[str]:
         """Detect available splits from config and filesystem.

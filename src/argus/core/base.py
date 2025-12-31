@@ -54,6 +54,16 @@ class Dataset(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_instance_counts(self) -> dict[str, dict[str, int]]:
+        """Get the number of annotation instances per class, per split.
+
+        Returns:
+            Dictionary mapping split name to dict of class name to instance count.
+            Example: {"train": {"person": 100, "car": 50}, "val": {"person": 20}}
+        """
+        pass
+
     def summary(self) -> dict:
         """Return a summary dict for table rendering.
 
