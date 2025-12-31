@@ -205,6 +205,55 @@ class COCODataset(Dataset):
 
         return counts
 
+    def get_image_counts(self) -> dict[str, dict[str, int]]:
+        """Get image counts per split, including background images.
+
+        Counts images in annotation files. Images with no annotations
+        are counted as background images.
+
+        Returns:
+            Dictionary mapping split name to dict with "total" and "background" counts.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                split = self._get_split_from_filename(ann_file.stem)
+
+                images = data.get("images", [])
+                annotations = data.get("annotations", [])
+
+                # Get all image IDs that have at least one annotation
+                annotated_image_ids: set[int] = set()
+                for ann in annotations:
+                    if isinstance(ann, dict) and "image_id" in ann:
+                        annotated_image_ids.add(ann["image_id"])
+
+                total = len(images)
+                background = 0
+                for img in images:
+                    if isinstance(img, dict) and "id" in img:
+                        if img["id"] not in annotated_image_ids:
+                            background += 1
+
+                # Merge with existing counts for this split (in case multiple files per split)
+                if split in counts:
+                    counts[split]["total"] += total
+                    counts[split]["background"] += background
+                else:
+                    counts[split] = {"total": total, "background": background}
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return counts
+
     @staticmethod
     def _get_split_from_filename(filename: str) -> str:
         """Extract split name from annotation filename.

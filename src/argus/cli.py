@@ -133,6 +133,7 @@ def stats(
     ) as progress:
         progress.add_task("Analyzing dataset...", total=None)
         counts = dataset.get_instance_counts()
+        image_counts = dataset.get_image_counts()
 
     if not counts:
         console.print("[yellow]No annotations found in the dataset.[/yellow]")
@@ -184,10 +185,29 @@ def stats(
     table.add_row(*totals_row)
 
     console.print(table)
+
+    # Build image stats line
+    image_parts = []
+    total_images = 0
+    total_background = 0
+    for split in all_splits:
+        if split in image_counts:
+            img_total = image_counts[split]["total"]
+            img_bg = image_counts[split]["background"]
+            total_images += img_total
+            total_background += img_bg
+            if img_bg > 0:
+                image_parts.append(f"{split}: {img_total} ({img_bg} background)")
+            else:
+                image_parts.append(f"{split}: {img_total}")
+
     console.print(f"\n[green]Dataset: {dataset.format.value.upper()} | "
                   f"Task: {dataset.task.value} | "
                   f"Classes: {len(sorted_classes)} | "
                   f"Total instances: {grand_total}[/green]")
+
+    if image_parts:
+        console.print(f"[blue]Images: {' | '.join(image_parts)}[/blue]")
 
 
 def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:

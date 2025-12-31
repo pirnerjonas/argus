@@ -160,6 +160,48 @@ class YOLODataset(Dataset):
 
         return counts
 
+    def get_image_counts(self) -> dict[str, dict[str, int]]:
+        """Get image counts per split, including background images.
+
+        Counts label files in labels/{split}/*.txt. Empty files are
+        counted as background images.
+
+        Returns:
+            Dictionary mapping split name to dict with "total" and "background" counts.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        # Determine splits to process - use "unsplit" for flat structure
+        splits_to_process = self.splits if self.splits else ["unsplit"]
+
+        for split in splits_to_process:
+            # Find label directory for this split
+            if split == "unsplit":
+                label_dir = self.path / "labels"
+            else:
+                label_dir = self.path / "labels" / split
+                if not label_dir.is_dir():
+                    label_dir = self.path / "labels"
+
+            if not label_dir.is_dir():
+                continue
+
+            total = 0
+            background = 0
+
+            for txt_file in label_dir.glob("*.txt"):
+                total += 1
+                try:
+                    content = txt_file.read_text(encoding="utf-8").strip()
+                    if not content:
+                        background += 1
+                except OSError:
+                    continue
+
+            counts[split] = {"total": total, "background": background}
+
+        return counts
+
     @classmethod
     def _detect_splits(cls, path: Path, config: dict) -> list[str]:
         """Detect available splits from config and filesystem.

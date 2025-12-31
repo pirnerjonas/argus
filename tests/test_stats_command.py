@@ -52,7 +52,95 @@ class TestYOLOInstanceCounts:
         # Expected: unsplit has 2 annotations (class 0 and class 1)
         assert "unsplit" in counts
         assert counts["unsplit"]["object1"] == 1  # class 0
-        assert counts["unsplit"]["object2"] == 1  # class 1class TestCOCOInstanceCounts:
+        assert counts["unsplit"]["object2"] == 1  # class 1
+
+
+class TestYOLOImageCounts:
+    """Tests for YOLO dataset image counting."""
+
+    def test_get_image_counts_detection(self, yolo_detection_dataset: Path) -> None:
+        """Test counting images in a YOLO detection dataset."""
+        dataset = YOLODataset.detect(yolo_detection_dataset)
+        assert dataset is not None
+
+        counts = dataset.get_image_counts()
+
+        # Expected: train has 1 image, val has 1 image, no background
+        assert "train" in counts
+        assert "val" in counts
+        assert counts["train"]["total"] == 1
+        assert counts["train"]["background"] == 0
+        assert counts["val"]["total"] == 1
+        assert counts["val"]["background"] == 0
+
+    def test_get_image_counts_with_background(self, tmp_path: Path) -> None:
+        """Test counting images with background-only annotations."""
+        dataset_path = tmp_path / "yolo_with_bg"
+        dataset_path.mkdir()
+
+        yaml_content = """
+names:
+  0: object
+"""
+        (dataset_path / "data.yaml").write_text(yaml_content)
+
+        (dataset_path / "images" / "train").mkdir(parents=True)
+        (dataset_path / "labels" / "train").mkdir(parents=True)
+
+        # Create 3 images: 2 with annotations, 1 empty (background)
+        (dataset_path / "images" / "train" / "img1.jpg").write_bytes(b"fake")
+        (dataset_path / "images" / "train" / "img2.jpg").write_bytes(b"fake")
+        (dataset_path / "images" / "train" / "img3.jpg").write_bytes(b"fake")
+
+        (dataset_path / "labels" / "train" / "img1.txt").write_text("0 0.5 0.5 0.2 0.3\n")
+        (dataset_path / "labels" / "train" / "img2.txt").write_text("0 0.3 0.3 0.1 0.1\n")
+        (dataset_path / "labels" / "train" / "img3.txt").write_text("")  # background
+
+        dataset = YOLODataset.detect(dataset_path)
+        assert dataset is not None
+
+        counts = dataset.get_image_counts()
+
+        assert counts["train"]["total"] == 3
+        assert counts["train"]["background"] == 1
+
+
+class TestCOCOImageCounts:
+    """Tests for COCO dataset image counting."""
+
+    def test_get_image_counts_with_background(self, tmp_path: Path) -> None:
+        """Test counting images with background-only images in COCO."""
+        dataset_path = tmp_path / "coco_with_bg"
+        dataset_path.mkdir()
+
+        annotations_dir = dataset_path / "annotations"
+        annotations_dir.mkdir()
+
+        coco_data = {
+            "images": [
+                {"id": 1, "file_name": "img1.jpg", "width": 100, "height": 100},
+                {"id": 2, "file_name": "img2.jpg", "width": 100, "height": 100},
+                {"id": 3, "file_name": "img3.jpg", "width": 100, "height": 100},
+            ],
+            "annotations": [
+                {"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 50, 50]},
+                {"id": 2, "image_id": 2, "category_id": 1, "bbox": [0, 0, 50, 50]},
+                # img3 has no annotations - background
+            ],
+            "categories": [{"id": 1, "name": "object"}],
+        }
+        (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+        dataset = COCODataset.detect(dataset_path)
+        assert dataset is not None
+
+        counts = dataset.get_image_counts()
+
+        assert counts["train"]["total"] == 3
+        assert counts["train"]["background"] == 1
+
+
+class TestCOCOInstanceCounts:
     """Tests for COCO dataset instance counting."""
 
     def test_get_instance_counts_detection(self, coco_detection_dataset: Path) -> None:
