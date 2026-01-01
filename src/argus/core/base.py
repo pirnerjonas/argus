@@ -70,7 +70,7 @@ class Dataset(ABC):
 
         Returns:
             Dictionary mapping split name to dict with "total" and "background" counts.
-            Example: {"train": {"total": 100, "background": 10}, "val": {"total": 20, "background": 2}}
+            Example: {"train": {"total": 100, "background": 10}, ...}
         """
         pass
 

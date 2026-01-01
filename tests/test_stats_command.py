@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -29,7 +28,9 @@ class TestYOLOInstanceCounts:
         assert counts["train"]["car"] == 1  # class 1
         assert counts["val"]["bicycle"] == 1  # class 2
 
-    def test_get_instance_counts_segmentation(self, yolo_segmentation_dataset: Path) -> None:
+    def test_get_instance_counts_segmentation(
+        self, yolo_segmentation_dataset: Path
+    ) -> None:
         """Test counting instances in a YOLO segmentation dataset."""
         dataset = YOLODataset.detect(yolo_segmentation_dataset)
         assert dataset is not None
@@ -42,7 +43,9 @@ class TestYOLOInstanceCounts:
         assert counts["train"]["cat"] == 1  # class 0
         assert counts["val"]["dog"] == 1  # class 1
 
-    def test_get_instance_counts_unsplit(self, yolo_flat_structure_dataset: Path) -> None:
+    def test_get_instance_counts_unsplit(
+        self, yolo_flat_structure_dataset: Path
+    ) -> None:
         """Test counting instances in an unsplit YOLO dataset."""
         dataset = YOLODataset.detect(yolo_flat_structure_dataset)
         assert dataset is not None
@@ -92,8 +95,10 @@ names:
         (dataset_path / "images" / "train" / "img2.jpg").write_bytes(b"fake")
         (dataset_path / "images" / "train" / "img3.jpg").write_bytes(b"fake")
 
-        (dataset_path / "labels" / "train" / "img1.txt").write_text("0 0.5 0.5 0.2 0.3\n")
-        (dataset_path / "labels" / "train" / "img2.txt").write_text("0 0.3 0.3 0.1 0.1\n")
+        label1 = "0 0.5 0.5 0.2 0.3\n"
+        label2 = "0 0.3 0.3 0.1 0.1\n"
+        (dataset_path / "labels" / "train" / "img1.txt").write_text(label1)
+        (dataset_path / "labels" / "train" / "img2.txt").write_text(label2)
         (dataset_path / "labels" / "train" / "img3.txt").write_text("")  # background
 
         dataset = YOLODataset.detect(dataset_path)
@@ -155,7 +160,9 @@ class TestCOCOInstanceCounts:
         assert counts["train"]["person"] == 1
         assert counts["train"]["car"] == 1
 
-    def test_get_instance_counts_segmentation(self, coco_segmentation_dataset: Path) -> None:
+    def test_get_instance_counts_segmentation(
+        self, coco_segmentation_dataset: Path
+    ) -> None:
         """Test counting instances in a COCO segmentation dataset."""
         dataset = COCODataset.detect(coco_segmentation_dataset)
         assert dataset is not None
@@ -218,7 +225,9 @@ class TestStatsCommand:
 
     def test_stats_yolo_dataset(self, yolo_detection_dataset: Path) -> None:
         """Test stats command with a YOLO dataset."""
-        result = runner.invoke(app, ["stats", "--dataset-path", str(yolo_detection_dataset)])
+        result = runner.invoke(
+            app, ["stats", "--dataset-path", str(yolo_detection_dataset)]
+        )
 
         assert result.exit_code == 0
         assert "person" in result.stdout
@@ -230,7 +239,9 @@ class TestStatsCommand:
 
     def test_stats_coco_dataset(self, coco_detection_dataset: Path) -> None:
         """Test stats command with a COCO dataset."""
-        result = runner.invoke(app, ["stats", "--dataset-path", str(coco_detection_dataset)])
+        result = runner.invoke(
+            app, ["stats", "--dataset-path", str(coco_detection_dataset)]
+        )
 
         assert result.exit_code == 0
         assert "person" in result.stdout

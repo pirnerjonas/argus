@@ -154,7 +154,8 @@ def stats(
     sorted_classes = sorted(all_classes)
 
     # Create table
-    table = Table(title=f"Instance Statistics: {dataset_path.name} ({dataset.format.value})")
+    title = f"Instance Statistics: {dataset_path.name} ({dataset.format.value})"
+    table = Table(title=title)
     table.add_column("Class", style="cyan")
     for split in all_splits:
         table.add_column(split, justify="right", style="green")

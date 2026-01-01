@@ -114,7 +114,7 @@ class COCODataset(Dataset):
             COCODataset if valid COCO format, None otherwise.
         """
         try:
-            with open(ann_file, "r", encoding="utf-8") as f:
+            with open(ann_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             if not isinstance(data, dict):
@@ -172,7 +172,7 @@ class COCODataset(Dataset):
 
         for ann_file in self.annotation_files:
             try:
-                with open(ann_file, "r", encoding="utf-8") as f:
+                with open(ann_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 if not isinstance(data, dict):
@@ -218,7 +218,7 @@ class COCODataset(Dataset):
 
         for ann_file in self.annotation_files:
             try:
-                with open(ann_file, "r", encoding="utf-8") as f:
+                with open(ann_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 if not isinstance(data, dict):
@@ -238,11 +238,12 @@ class COCODataset(Dataset):
                 total = len(images)
                 background = 0
                 for img in images:
-                    if isinstance(img, dict) and "id" in img:
-                        if img["id"] not in annotated_image_ids:
-                            background += 1
+                    is_valid = isinstance(img, dict) and "id" in img
+                    if is_valid and img["id"] not in annotated_image_ids:
+                        background += 1
 
-                # Merge with existing counts for this split (in case multiple files per split)
+                # Merge with existing counts for this split
+                # (in case multiple files per split)
                 if split in counts:
                     counts[split]["total"] += total
                     counts[split]["background"] += background
@@ -313,15 +314,12 @@ class COCODataset(Dataset):
         for ann_file in annotation_files:
             name_lower = ann_file.stem.lower()
 
-            if "train" in name_lower:
-                if "train" not in splits:
-                    splits.append("train")
-            elif "val" in name_lower:
-                if "val" not in splits:
-                    splits.append("val")
-            elif "test" in name_lower:
-                if "test" not in splits:
-                    splits.append("test")
+            if "train" in name_lower and "train" not in splits:
+                splits.append("train")
+            elif "val" in name_lower and "val" not in splits:
+                splits.append("val")
+            elif "test" in name_lower and "test" not in splits:
+                splits.append("test")
 
         # If no splits detected from filenames, default to train
         if not splits:

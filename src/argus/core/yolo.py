@@ -61,7 +61,7 @@ class YOLODataset(Dataset):
 
         for yaml_file in yaml_files:
             try:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     config = yaml.safe_load(f)
 
                 if not isinstance(config, dict):
@@ -140,7 +140,7 @@ class YOLODataset(Dataset):
             # Parse all label files
             for txt_file in label_dir.glob("*.txt"):
                 try:
-                    with open(txt_file, "r", encoding="utf-8") as f:
+                    with open(txt_file, encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             if not line:
@@ -149,8 +149,10 @@ class YOLODataset(Dataset):
                             if len(parts) >= 5:  # Valid annotation line
                                 try:
                                     class_id = int(parts[0])
-                                    class_name = id_to_name.get(class_id, f"class_{class_id}")
-                                    split_counts[class_name] = split_counts.get(class_name, 0) + 1
+                                    fallback = f"class_{class_id}"
+                                    class_name = id_to_name.get(class_id, fallback)
+                                    current = split_counts.get(class_name, 0)
+                                    split_counts[class_name] = current + 1
                                 except ValueError:
                                     continue
                 except OSError:
@@ -275,7 +277,7 @@ class YOLODataset(Dataset):
             txt_files = list(label_dir.glob("*.txt"))
             for txt_file in txt_files[:5]:  # Sample up to 5 files
                 try:
-                    with open(txt_file, "r", encoding="utf-8") as f:
+                    with open(txt_file, encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             if not line:

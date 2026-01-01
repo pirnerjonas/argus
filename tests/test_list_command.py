@@ -2,10 +2,9 @@
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
-from argus.cli import app, _discover_datasets
+from argus.cli import _discover_datasets, app
 from argus.core import COCODataset, YOLODataset
 from argus.core.base import DatasetFormat, TaskType
 
@@ -93,7 +92,9 @@ class TestCOCODatasetDetection:
         assert dataset.num_classes == 3
         assert "val" in dataset.splits
 
-    def test_detect_invalid_coco_missing_categories(self, invalid_coco_missing_categories: Path):
+    def test_detect_invalid_coco_missing_categories(
+        self, invalid_coco_missing_categories: Path
+    ):
         """Test that JSON without 'categories' is not detected as COCO."""
         dataset = COCODataset.detect(invalid_coco_missing_categories)
         assert dataset is None

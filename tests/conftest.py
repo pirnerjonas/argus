@@ -50,7 +50,8 @@ names:
     (dataset_path / "images" / "val" / "img002.jpg").write_bytes(b"fake image")
 
     # Create detection labels (5 columns: class x_center y_center width height)
-    (dataset_path / "labels" / "train" / "img001.txt").write_text("0 0.5 0.5 0.2 0.3\n1 0.3 0.7 0.1 0.2\n")
+    train_label = "0 0.5 0.5 0.2 0.3\n1 0.3 0.7 0.1 0.2\n"
+    (dataset_path / "labels" / "train" / "img001.txt").write_text(train_label)
     (dataset_path / "labels" / "val" / "img002.txt").write_text("2 0.6 0.4 0.15 0.25\n")
 
     return dataset_path
@@ -333,8 +334,12 @@ names:
     annotations_dir = coco_path / "annotations"
     annotations_dir.mkdir()
     coco_data = {
-        "images": [{"id": 1, "file_name": "img.jpg", "width": 100, "height": 100}],
-        "annotations": [{"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 50, 50]}],
+        "images": [
+            {"id": 1, "file_name": "img.jpg", "width": 100, "height": 100}
+        ],
+        "annotations": [
+            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 50, 50]}
+        ],
         "categories": [{"id": 1, "name": "obj"}],
     }
     (annotations_dir / "annotations.json").write_text(json.dumps(coco_data))
