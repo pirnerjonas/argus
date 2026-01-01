@@ -351,7 +351,9 @@ class _ImageViewer:
             return False
 
         self.current_img = img
-        self.annotated_img = _draw_annotations(img.copy(), annotations, self.class_colors)
+        self.annotated_img = _draw_annotations(
+            img.copy(), annotations, self.class_colors
+        )
         return True
 
     def _get_display_image(self) -> np.ndarray:
@@ -391,7 +393,9 @@ class _ImageViewer:
 
         # Add info overlay
         image_path = self.image_paths[self.current_idx]
-        info_text = f"[{self.current_idx + 1}/{len(self.image_paths)}] {image_path.name}"
+        idx = self.current_idx + 1
+        total = len(self.image_paths)
+        info_text = f"[{idx}/{total}] {image_path.name}"
         if self.zoom > 1.0:
             info_text += f" (Zoom: {self.zoom:.1f}x)"
 
@@ -406,7 +410,9 @@ class _ImageViewer:
 
         return display
 
-    def _mouse_callback(self, event: int, x: int, y: int, flags: int, param: None) -> None:
+    def _mouse_callback(
+        self, event: int, x: int, y: int, flags: int, param: None
+    ) -> None:
         """Handle mouse events for zoom and pan."""
         if event == cv2.EVENT_MOUSEWHEEL:
             # Zoom in/out
@@ -467,14 +473,13 @@ class _ImageViewer:
 
         while True:
             # Load image if needed
-            if self.annotated_img is None:
-                if not self._load_current_image():
-                    console.print(
-                        f"[yellow]Warning: Could not load "
-                        f"{self.image_paths[self.current_idx]}[/yellow]"
-                    )
-                    self._next_image()
-                    continue
+            if self.annotated_img is None and not self._load_current_image():
+                console.print(
+                    f"[yellow]Warning: Could not load "
+                    f"{self.image_paths[self.current_idx]}[/yellow]"
+                )
+                self._next_image()
+                continue
 
             # Display image
             display = self._get_display_image()
