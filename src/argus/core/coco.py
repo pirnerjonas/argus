@@ -114,7 +114,7 @@ class COCODataset(Dataset):
             COCODataset if valid COCO format, None otherwise.
         """
         try:
-            with open(ann_file, "r", encoding="utf-8") as f:
+            with open(ann_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             if not isinstance(data, dict):
@@ -172,7 +172,7 @@ class COCODataset(Dataset):
 
         for ann_file in self.annotation_files:
             try:
-                with open(ann_file, "r", encoding="utf-8") as f:
+                with open(ann_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 if not isinstance(data, dict):
@@ -199,6 +199,56 @@ class COCODataset(Dataset):
                         split_counts[class_name] = split_counts.get(class_name, 0) + 1
 
                 counts[split] = split_counts
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return counts
+
+    def get_image_counts(self) -> dict[str, dict[str, int]]:
+        """Get image counts per split, including background images.
+
+        Counts images in annotation files. Images with no annotations
+        are counted as background images.
+
+        Returns:
+            Dictionary mapping split name to dict with "total" and "background" counts.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                split = self._get_split_from_filename(ann_file.stem)
+
+                images = data.get("images", [])
+                annotations = data.get("annotations", [])
+
+                # Get all image IDs that have at least one annotation
+                annotated_image_ids: set[int] = set()
+                for ann in annotations:
+                    if isinstance(ann, dict) and "image_id" in ann:
+                        annotated_image_ids.add(ann["image_id"])
+
+                total = len(images)
+                background = 0
+                for img in images:
+                    is_valid = isinstance(img, dict) and "id" in img
+                    if is_valid and img["id"] not in annotated_image_ids:
+                        background += 1
+
+                # Merge with existing counts for this split
+                # (in case multiple files per split)
+                if split in counts:
+                    counts[split]["total"] += total
+                    counts[split]["background"] += background
+                else:
+                    counts[split] = {"total": total, "background": background}
 
             except (json.JSONDecodeError, OSError):
                 continue
@@ -264,15 +314,12 @@ class COCODataset(Dataset):
         for ann_file in annotation_files:
             name_lower = ann_file.stem.lower()
 
-            if "train" in name_lower:
-                if "train" not in splits:
-                    splits.append("train")
-            elif "val" in name_lower:
-                if "val" not in splits:
-                    splits.append("val")
-            elif "test" in name_lower:
-                if "test" not in splits:
-                    splits.append("test")
+            if "train" in name_lower and "train" not in splits:
+                splits.append("train")
+            elif "val" in name_lower and "val" not in splits:
+                splits.append("val")
+            elif "test" in name_lower and "test" not in splits:
+                splits.append("test")
 
         # If no splits detected from filenames, default to train
         if not splits:

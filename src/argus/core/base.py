@@ -64,6 +64,16 @@ class Dataset(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_image_counts(self) -> dict[str, dict[str, int]]:
+        """Get image counts per split, including background images.
+
+        Returns:
+            Dictionary mapping split name to dict with "total" and "background" counts.
+            Example: {"train": {"total": 100, "background": 10}, ...}
+        """
+        pass
+
     def summary(self) -> dict:
         """Return a summary dict for table rendering.
 
