@@ -1,5 +1,6 @@
 """Tests for dataset detection and list command."""
 
+import os
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -8,6 +9,8 @@ from argus.cli import _discover_datasets, app
 from argus.core import COCODataset, YOLODataset
 from argus.core.base import DatasetFormat, TaskType
 
+# Set terminal width to prevent Rich from truncating output in CI
+os.environ["COLUMNS"] = "200"
 runner = CliRunner()
 
 

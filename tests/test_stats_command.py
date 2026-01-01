@@ -1,6 +1,7 @@
 """Tests for the stats command."""
 
 import json
+import os
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -8,6 +9,8 @@ from typer.testing import CliRunner
 from argus.cli import app
 from argus.core import COCODataset, YOLODataset
 
+# Set terminal width to prevent Rich from truncating output in CI
+os.environ["COLUMNS"] = "200"
 runner = CliRunner()
 
 
