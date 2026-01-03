@@ -245,6 +245,50 @@ def coco_segmentation_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def coco_unsplit_dataset(tmp_path: Path) -> Path:
+    """Create a COCO dataset with a single unsplit annotation file."""
+    dataset_path = tmp_path / "coco_unsplit"
+    dataset_path.mkdir()
+
+    annotations_dir = dataset_path / "annotations"
+    annotations_dir.mkdir()
+
+    coco_data = {
+        "info": {"description": "Unsplit dataset"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 640, "height": 480},
+            {"id": 2, "file_name": "img002.jpg", "width": 640, "height": 480},
+            {"id": 3, "file_name": "img003.jpg", "width": 640, "height": 480},
+            {"id": 4, "file_name": "img004.jpg", "width": 640, "height": 480},
+            {"id": 5, "file_name": "img005.jpg", "width": 640, "height": 480},
+            {"id": 6, "file_name": "img006.jpg", "width": 640, "height": 480},
+        ],
+        "annotations": [
+            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [100, 100, 50, 60]},
+            {"id": 2, "image_id": 2, "category_id": 2, "bbox": [50, 50, 40, 30]},
+            {"id": 3, "image_id": 3, "category_id": 1, "bbox": [10, 20, 30, 40]},
+            {"id": 4, "image_id": 4, "category_id": 2, "bbox": [15, 25, 35, 45]},
+            {"id": 5, "image_id": 5, "category_id": 1, "bbox": [20, 30, 10, 15]},
+            {"id": 6, "image_id": 6, "category_id": 2, "bbox": [5, 10, 20, 25]},
+        ],
+        "categories": [
+            {"id": 1, "name": "person", "supercategory": "human"},
+            {"id": 2, "name": "car", "supercategory": "vehicle"},
+        ],
+    }
+
+    (annotations_dir / "annotations.json").write_text(json.dumps(coco_data))
+
+    images_dir = dataset_path / "images"
+    images_dir.mkdir()
+    for idx in range(1, 7):
+        (images_dir / f"img{idx:03d}.jpg").write_bytes(b"fake image")
+
+    return dataset_path
+
+
+@pytest.fixture
 def invalid_yaml_missing_names(tmp_path: Path) -> Path:
     """Create an invalid YOLO dataset (YAML missing 'names' key)."""
     dataset_path = tmp_path / "invalid_yaml"
