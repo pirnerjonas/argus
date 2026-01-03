@@ -1,8 +1,11 @@
 """Argus CLI - Vision AI dataset toolkit."""
 
+import hashlib
 from pathlib import Path
 from typing import Annotated
 
+import cv2
+import numpy as np
 import typer
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -209,6 +212,385 @@ def stats(
 
     if image_parts:
         console.print(f"[blue]Images: {' | '.join(image_parts)}[/blue]")
+
+
+@app.command(name="view")
+def view(
+    dataset_path: Annotated[
+        Path,
+        typer.Option(
+            "--dataset-path",
+            "-d",
+            help="Path to the dataset root directory.",
+        ),
+    ] = Path("."),
+    split: Annotated[
+        str | None,
+        typer.Option(
+            "--split",
+            "-s",
+            help="Specific split to view (train, val, test).",
+        ),
+    ] = None,
+) -> None:
+    """View annotated images in a dataset.
+
+    Opens an interactive viewer to browse images with their annotations
+    (bounding boxes and segmentation masks) overlaid.
+
+    Controls:
+        - Right Arrow / N: Next image
+        - Left Arrow / P: Previous image
+        - Mouse Wheel: Zoom in/out
+        - Mouse Drag: Pan when zoomed
+        - R: Reset zoom
+        - Q / ESC: Quit viewer
+    """
+    # Resolve path and validate
+    dataset_path = dataset_path.resolve()
+    if not dataset_path.exists():
+        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
+        raise typer.Exit(1)
+    if not dataset_path.is_dir():
+        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
+        raise typer.Exit(1)
+
+    # Detect dataset
+    dataset = _detect_dataset(dataset_path)
+    if not dataset:
+        console.print(
+            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            "[yellow]Ensure the path points to a dataset root containing "
+            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Validate split if specified
+    if split and split not in dataset.splits:
+        available = ", ".join(dataset.splits) if dataset.splits else "none"
+        console.print(
+            f"[red]Error: Split '{split}' not found in dataset.[/red]\n"
+            f"[yellow]Available splits: {available}[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Get image paths
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        progress.add_task("Loading images...", total=None)
+        image_paths = dataset.get_image_paths(split)
+
+    if not image_paths:
+        console.print("[yellow]No images found in the dataset.[/yellow]")
+        return
+
+    console.print(
+        f"[green]Found {len(image_paths)} images. "
+        f"Opening viewer...[/green]\n"
+        "[dim]Controls: ← / → or P / N to navigate, "
+        "Mouse wheel to zoom, Drag to pan, R to reset, Q / ESC to quit[/dim]"
+    )
+
+    # Generate consistent colors for each class
+    class_colors = _generate_class_colors(dataset.class_names)
+
+    # Create and run the interactive viewer
+    viewer = _ImageViewer(
+        image_paths=image_paths,
+        dataset=dataset,
+        class_colors=class_colors,
+        window_name=f"Argus Viewer - {dataset_path.name}",
+    )
+    viewer.run()
+
+    console.print("[green]Viewer closed.[/green]")
+
+
+class _ImageViewer:
+    """Interactive image viewer with zoom and pan support."""
+
+    def __init__(
+        self,
+        image_paths: list[Path],
+        dataset: Dataset,
+        class_colors: dict[str, tuple[int, int, int]],
+        window_name: str,
+    ):
+        self.image_paths = image_paths
+        self.dataset = dataset
+        self.class_colors = class_colors
+        self.window_name = window_name
+
+        self.current_idx = 0
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+
+        # Mouse state for panning
+        self.dragging = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.pan_start_x = 0.0
+        self.pan_start_y = 0.0
+
+        # Current image cache
+        self.current_img: np.ndarray | None = None
+        self.annotated_img: np.ndarray | None = None
+
+    def _load_current_image(self) -> bool:
+        """Load and annotate the current image."""
+        image_path = self.image_paths[self.current_idx]
+        annotations = self.dataset.get_annotations_for_image(image_path)
+
+        img = cv2.imread(str(image_path))
+        if img is None:
+            return False
+
+        self.current_img = img
+        self.annotated_img = _draw_annotations(
+            img.copy(), annotations, self.class_colors
+        )
+        return True
+
+    def _get_display_image(self) -> np.ndarray:
+        """Get the image transformed for current zoom/pan."""
+        if self.annotated_img is None:
+            return np.zeros((480, 640, 3), dtype=np.uint8)
+
+        img = self.annotated_img
+        h, w = img.shape[:2]
+
+        if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
+            display = img.copy()
+        else:
+            # Calculate the visible region
+            view_w = int(w / self.zoom)
+            view_h = int(h / self.zoom)
+
+            # Center point with pan offset
+            cx = w / 2 + self.pan_x
+            cy = h / 2 + self.pan_y
+
+            # Calculate crop bounds
+            x1 = int(max(0, cx - view_w / 2))
+            y1 = int(max(0, cy - view_h / 2))
+            x2 = int(min(w, x1 + view_w))
+            y2 = int(min(h, y1 + view_h))
+
+            # Adjust if we hit boundaries
+            if x2 - x1 < view_w:
+                x1 = max(0, x2 - view_w)
+            if y2 - y1 < view_h:
+                y1 = max(0, y2 - view_h)
+
+            # Crop and resize
+            cropped = img[y1:y2, x1:x2]
+            display = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+
+        # Add info overlay
+        image_path = self.image_paths[self.current_idx]
+        idx = self.current_idx + 1
+        total = len(self.image_paths)
+        info_text = f"[{idx}/{total}] {image_path.name}"
+        if self.zoom > 1.0:
+            info_text += f" (Zoom: {self.zoom:.1f}x)"
+
+        cv2.putText(
+            display, info_text, (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
+        )
+        cv2.putText(
+            display, info_text, (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
+        )
+
+        return display
+
+    def _mouse_callback(
+        self, event: int, x: int, y: int, flags: int, param: None
+    ) -> None:
+        """Handle mouse events for zoom and pan."""
+        if event == cv2.EVENT_MOUSEWHEEL:
+            # Zoom in/out
+            if flags > 0:
+                self.zoom = min(10.0, self.zoom * 1.2)
+            else:
+                self.zoom = max(1.0, self.zoom / 1.2)
+
+            # Reset pan if zoomed out to 1x
+            if self.zoom == 1.0:
+                self.pan_x = 0.0
+                self.pan_y = 0.0
+
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            self.dragging = True
+            self.drag_start_x = x
+            self.drag_start_y = y
+            self.pan_start_x = self.pan_x
+            self.pan_start_y = self.pan_y
+
+        elif event == cv2.EVENT_MOUSEMOVE and self.dragging:
+            if self.zoom > 1.0 and self.annotated_img is not None:
+                h, w = self.annotated_img.shape[:2]
+                # Calculate pan delta (inverted for natural feel)
+                dx = (self.drag_start_x - x) / self.zoom
+                dy = (self.drag_start_y - y) / self.zoom
+
+                # Update pan with limits
+                max_pan_x = w * (1 - 1 / self.zoom) / 2
+                max_pan_y = h * (1 - 1 / self.zoom) / 2
+
+                self.pan_x = max(-max_pan_x, min(max_pan_x, self.pan_start_x + dx))
+                self.pan_y = max(-max_pan_y, min(max_pan_y, self.pan_start_y + dy))
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.dragging = False
+
+    def _reset_view(self) -> None:
+        """Reset zoom and pan to default."""
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+
+    def _next_image(self) -> None:
+        """Go to next image."""
+        self.current_idx = (self.current_idx + 1) % len(self.image_paths)
+        self._reset_view()
+
+    def _prev_image(self) -> None:
+        """Go to previous image."""
+        self.current_idx = (self.current_idx - 1) % len(self.image_paths)
+        self._reset_view()
+
+    def run(self) -> None:
+        """Run the interactive viewer."""
+        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.setMouseCallback(self.window_name, self._mouse_callback)
+
+        while True:
+            # Load image if needed
+            if self.annotated_img is None and not self._load_current_image():
+                console.print(
+                    f"[yellow]Warning: Could not load "
+                    f"{self.image_paths[self.current_idx]}[/yellow]"
+                )
+                self._next_image()
+                continue
+
+            # Display image
+            display = self._get_display_image()
+            cv2.imshow(self.window_name, display)
+
+            # Wait for input (short timeout for smooth panning)
+            key = cv2.waitKey(30) & 0xFF
+
+            # Handle keyboard input
+            if key == ord("q") or key == 27:  # Q or ESC
+                break
+            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
+                self.annotated_img = None
+                self._next_image()
+            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
+                self.annotated_img = None
+                self._prev_image()
+            elif key == ord("r"):  # R to reset zoom
+                self._reset_view()
+
+        cv2.destroyAllWindows()
+
+
+def _generate_class_colors(class_names: list[str]) -> dict[str, tuple[int, int, int]]:
+    """Generate consistent colors for each class name.
+
+    Args:
+        class_names: List of class names.
+
+    Returns:
+        Dictionary mapping class name to BGR color tuple.
+    """
+    colors: dict[str, tuple[int, int, int]] = {}
+
+    for name in class_names:
+        # Generate a consistent hash-based color
+        hash_val = int(hashlib.md5(name.encode()).hexdigest()[:6], 16)
+        r = (hash_val >> 16) & 0xFF
+        g = (hash_val >> 8) & 0xFF
+        b = hash_val & 0xFF
+
+        # Ensure colors are bright enough to be visible
+        min_brightness = 100
+        r = max(r, min_brightness)
+        g = max(g, min_brightness)
+        b = max(b, min_brightness)
+
+        colors[name] = (b, g, r)  # BGR for OpenCV
+
+    return colors
+
+
+def _draw_annotations(
+    img: np.ndarray,
+    annotations: list[dict],
+    class_colors: dict[str, tuple[int, int, int]],
+) -> np.ndarray:
+    """Draw annotations on an image.
+
+    Args:
+        img: OpenCV image (BGR).
+        annotations: List of annotation dicts.
+        class_colors: Dictionary mapping class name to BGR color.
+
+    Returns:
+        Image with annotations drawn.
+    """
+    default_color = (0, 255, 0)  # Green default
+
+    for ann in annotations:
+        class_name = ann["class_name"]
+        color = class_colors.get(class_name, default_color)
+        bbox = ann.get("bbox")
+        polygon = ann.get("polygon")
+
+        # Draw polygon if available (segmentation)
+        if polygon:
+            pts = np.array(polygon, dtype=np.int32)
+            cv2.polylines(img, [pts], isClosed=True, color=color, thickness=2)
+            # Draw semi-transparent fill
+            overlay = img.copy()
+            cv2.fillPoly(overlay, [pts], color)
+            cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+
+        # Draw bounding box
+        if bbox:
+            x, y, w, h = bbox
+            x1, y1 = int(x), int(y)
+            x2, y2 = int(x + w), int(y + h)
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+
+            # Draw label background
+            label = class_name
+            (label_w, label_h), baseline = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+            )
+            cv2.rectangle(
+                img,
+                (x1, y1 - label_h - baseline - 5),
+                (x1 + label_w + 5, y1),
+                color,
+                -1,
+            )
+            # Draw label text
+            cv2.putText(
+                img, label,
+                (x1 + 2, y1 - baseline - 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1
+            )
+
+    return img
 
 
 def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:

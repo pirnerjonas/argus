@@ -292,3 +292,139 @@ class YOLODataset(Dataset):
 
         # Default to detection if no labels found or inconclusive
         return TaskType.DETECTION
+
+    def get_image_paths(self, split: str | None = None) -> list[Path]:
+        """Get all image file paths for a split or the entire dataset.
+
+        Args:
+            split: Specific split to get images from. If None, returns all images.
+
+        Returns:
+            List of image file paths sorted alphabetically.
+        """
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+        image_paths: list[Path] = []
+
+        # Determine which splits to search
+        if split:
+            splits_to_search = [split]
+        elif self.splits:
+            splits_to_search = self.splits
+        else:
+            splits_to_search = ["unsplit"]
+
+        for s in splits_to_search:
+            if s == "unsplit":
+                image_dir = self.path / "images"
+            else:
+                image_dir = self.path / "images" / s
+                if not image_dir.is_dir():
+                    image_dir = self.path / "images"
+
+            if image_dir.is_dir():
+                for img_file in image_dir.iterdir():
+                    if img_file.suffix.lower() in image_extensions:
+                        image_paths.append(img_file)
+
+        return sorted(image_paths, key=lambda p: p.name)
+
+    def get_annotations_for_image(self, image_path: Path) -> list[dict]:
+        """Get annotations for a specific image.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            List of annotation dicts with bbox/polygon in absolute coordinates.
+        """
+        import cv2
+
+        annotations: list[dict] = []
+
+        # Build class_id -> class_name mapping
+        id_to_name = {i: name for i, name in enumerate(self.class_names)}
+
+        # Find the corresponding label file
+        # Image: images/train/img.jpg -> Label: labels/train/img.txt
+        image_parts = image_path.parts
+        try:
+            images_idx = image_parts.index("images")
+            label_parts = list(image_parts)
+            label_parts[images_idx] = "labels"
+            label_path = Path(*label_parts).with_suffix(".txt")
+        except ValueError:
+            # Fallback: look in labels directory with same name
+            label_path = self.path / "labels" / image_path.with_suffix(".txt").name
+
+        if not label_path.exists():
+            return annotations
+
+        # Get image dimensions for converting normalized coords to absolute
+        img = cv2.imread(str(image_path))
+        if img is None:
+            return annotations
+        img_height, img_width = img.shape[:2]
+
+        try:
+            with open(label_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    parts = line.split()
+                    if len(parts) < 5:
+                        continue
+
+                    try:
+                        class_id = int(parts[0])
+                        class_name = id_to_name.get(class_id, f"class_{class_id}")
+
+                        if len(parts) == 5:
+                            # Detection: class x_center y_center width height
+                            x_center = float(parts[1]) * img_width
+                            y_center = float(parts[2]) * img_height
+                            width = float(parts[3]) * img_width
+                            height = float(parts[4]) * img_height
+
+                            # Convert to x, y, w, h (top-left corner)
+                            x = x_center - width / 2
+                            y = y_center - height / 2
+
+                            annotations.append({
+                                "class_name": class_name,
+                                "class_id": class_id,
+                                "bbox": (x, y, width, height),
+                                "polygon": None,
+                            })
+                        else:
+                            # Segmentation: class x1 y1 x2 y2 ... xn yn
+                            coords = [float(p) for p in parts[1:]]
+                            polygon = []
+                            for i in range(0, len(coords), 2):
+                                px = coords[i] * img_width
+                                py = coords[i + 1] * img_height
+                                polygon.append((px, py))
+
+                            # Calculate bounding box from polygon
+                            xs = [p[0] for p in polygon]
+                            ys = [p[1] for p in polygon]
+                            x = min(xs)
+                            y = min(ys)
+                            width = max(xs) - x
+                            height = max(ys) - y
+
+                            annotations.append({
+                                "class_name": class_name,
+                                "class_id": class_id,
+                                "bbox": (x, y, width, height),
+                                "polygon": polygon,
+                            })
+
+                    except (ValueError, IndexError):
+                        continue
+
+        except OSError:
+            pass
+
+        return annotations

@@ -74,6 +74,34 @@ class Dataset(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_image_paths(self, split: str | None = None) -> list[Path]:
+        """Get all image file paths for a split or the entire dataset.
+
+        Args:
+            split: Specific split to get images from. If None, returns all images.
+
+        Returns:
+            List of image file paths.
+        """
+        pass
+
+    @abstractmethod
+    def get_annotations_for_image(self, image_path: Path) -> list[dict]:
+        """Get annotations for a specific image.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            List of annotation dicts with keys:
+            - "class_name": str - name of the class
+            - "class_id": int - class ID
+            - "bbox": tuple[float, float, float, float] | None - (x, y, w, h) absolute
+            - "polygon": list[tuple[float, float]] | None - list of (x, y) points
+        """
+        pass
+
     def summary(self) -> dict:
         """Return a summary dict for table rendering.
 

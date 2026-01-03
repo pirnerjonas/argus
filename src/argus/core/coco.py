@@ -326,3 +326,141 @@ class COCODataset(Dataset):
             splits.append("train")
 
         return splits
+
+    def get_image_paths(self, split: str | None = None) -> list[Path]:
+        """Get all image file paths for a split or the entire dataset.
+
+        Args:
+            split: Specific split to get images from. If None, returns all images.
+
+        Returns:
+            List of image file paths sorted alphabetically.
+        """
+        image_paths: list[Path] = []
+        seen_files: set[str] = set()
+
+        for ann_file in self.annotation_files:
+            # Filter by split if specified
+            if split:
+                file_split = self._get_split_from_filename(ann_file.stem)
+                if file_split != split:
+                    continue
+
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                images = data.get("images", [])
+                file_split = self._get_split_from_filename(ann_file.stem)
+
+                for img in images:
+                    if not isinstance(img, dict) or "file_name" not in img:
+                        continue
+
+                    file_name = img["file_name"]
+                    if file_name in seen_files:
+                        continue
+                    seen_files.add(file_name)
+
+                    # Try common image directory patterns
+                    possible_paths = [
+                        self.path / "images" / file_split / file_name,
+                        self.path / "images" / file_name,
+                        self.path / file_split / file_name,
+                        self.path / file_name,
+                    ]
+
+                    for img_path in possible_paths:
+                        if img_path.exists():
+                            image_paths.append(img_path)
+                            break
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return sorted(image_paths, key=lambda p: p.name)
+
+    def get_annotations_for_image(self, image_path: Path) -> list[dict]:
+        """Get annotations for a specific image.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            List of annotation dicts with bbox/polygon in absolute coordinates.
+        """
+        annotations: list[dict] = []
+        file_name = image_path.name
+
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                # Build image_id lookup
+                images = data.get("images", [])
+                image_id = None
+
+                for img in images:
+                    if isinstance(img, dict) and img.get("file_name") == file_name:
+                        image_id = img.get("id")
+                        break
+
+                if image_id is None:
+                    continue
+
+                # Build category_id -> name mapping
+                categories = data.get("categories", [])
+                id_to_name: dict[int, str] = {}
+                for cat in categories:
+                    if isinstance(cat, dict) and "id" in cat and "name" in cat:
+                        id_to_name[cat["id"]] = cat["name"]
+
+                # Find annotations for this image
+                for ann in data.get("annotations", []):
+                    if not isinstance(ann, dict):
+                        continue
+                    if ann.get("image_id") != image_id:
+                        continue
+
+                    cat_id = ann.get("category_id", 0)
+                    class_name = id_to_name.get(cat_id, f"class_{cat_id}")
+
+                    # Get bbox (COCO format: x, y, width, height)
+                    bbox = ann.get("bbox")
+                    bbox_tuple = None
+                    if bbox and len(bbox) >= 4:
+                        bbox_tuple = (
+                            float(bbox[0]),
+                            float(bbox[1]),
+                            float(bbox[2]),
+                            float(bbox[3]),
+                        )
+
+                    # Get segmentation polygon
+                    polygon = None
+                    seg = ann.get("segmentation")
+                    if isinstance(seg, list) and seg and isinstance(seg[0], list):
+                        # Polygon format: [[x1, y1, x2, y2, ...]]
+                        coords = seg[0]
+                        polygon = []
+                        for i in range(0, len(coords), 2):
+                            polygon.append((float(coords[i]), float(coords[i + 1])))
+
+                    annotations.append({
+                        "class_name": class_name,
+                        "class_id": cat_id,
+                        "bbox": bbox_tuple,
+                        "polygon": polygon,
+                    })
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return annotations
