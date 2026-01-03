@@ -401,7 +401,9 @@ def split_dataset(
         ) as progress:
             progress.add_task("Creating YOLO splits...", total=None)
             try:
-                counts = split_yolo_dataset(dataset, output_path, ratios, stratify, seed)
+                counts = split_yolo_dataset(
+                    dataset, output_path, ratios, stratify, seed
+                )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc

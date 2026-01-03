@@ -6,8 +6,8 @@ import json
 import math
 import random
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import yaml
 
@@ -39,7 +39,9 @@ def parse_ratio(ratio: str) -> tuple[float, float, float]:
     return normalized[0], normalized[1], normalized[2]
 
 
-def _compute_split_sizes(total: int, ratios: tuple[float, float, float]) -> dict[str, int]:
+def _compute_split_sizes(
+    total: int, ratios: tuple[float, float, float]
+) -> dict[str, int]:
     raw = [total * ratio for ratio in ratios]
     base = [int(math.floor(val)) for val in raw]
     remainder = total - sum(base)
@@ -84,7 +86,9 @@ def _build_stratified_split(
         item_labels = labels.get(item, set())
         if item_labels:
             scores = {
-                split: sum(remaining_class[split].get(label, 0.0) for label in item_labels)
+                split: sum(
+                    remaining_class[split].get(label, 0.0) for label in item_labels
+                )
                 for split in candidates
             }
             best_score = max(scores.values())
@@ -95,7 +99,9 @@ def _build_stratified_split(
         if len(best_splits) > 1:
             max_remaining = max(remaining_items[split] for split in best_splits)
             best_splits = [
-                split for split in best_splits if remaining_items[split] == max_remaining
+                split
+                for split in best_splits
+                if remaining_items[split] == max_remaining
             ]
 
         chosen = rng.choice(best_splits)
@@ -157,7 +163,7 @@ def split_yolo_dataset(
     label_dir = dataset.path / "labels"
 
     labels: dict[str, set[int]] = {}
-    for stem, image_path in image_map.items():
+    for stem, _image_path in image_map.items():
         label_path = label_dir / f"{stem}.txt"
         label_set: set[int] = set()
         if label_path.exists():
