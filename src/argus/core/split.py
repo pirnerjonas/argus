@@ -70,7 +70,9 @@ def _compute_split_sizes(
                 if j != idx and base[j] > (1 if ratios[j] > 0.0 else 0)
             ]
             if not donor_candidates:
-                donor_candidates = [j for j in range(len(base)) if j != idx and base[j] > 0]
+                donor_candidates = [
+                    j for j in range(len(base)) if j != idx and base[j] > 0
+                ]
             if not donor_candidates:
                 continue
 
