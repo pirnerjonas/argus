@@ -42,6 +42,9 @@ def parse_ratio(ratio: str) -> tuple[float, float, float]:
 def _compute_split_sizes(
     total: int, ratios: tuple[float, float, float]
 ) -> dict[str, int]:
+    if total < 0:
+        raise ValueError("Total must be non-negative.")
+
     raw = [total * ratio for ratio in ratios]
     base = [int(math.floor(val)) for val in raw]
     remainder = total - sum(base)
@@ -50,6 +53,30 @@ def _compute_split_sizes(
     order = sorted(range(len(fractional)), key=lambda i: fractional[i], reverse=True)
     for idx in order[:remainder]:
         base[idx] += 1
+
+    # For small datasets, largest-remainder can still allocate 0 samples to a
+    # non-zero split (e.g., 6 items with 0.8/0.1/0.1 -> 5/1/0). If there are
+    # enough samples to cover each requested split, enforce a minimum of 1.
+    nonzero_indices = [i for i, ratio in enumerate(ratios) if ratio > 0.0]
+    if total >= len(nonzero_indices):
+        for idx in nonzero_indices:
+            if base[idx] > 0:
+                continue
+
+            # Take one sample from the split with the most samples.
+            donor_candidates = [
+                j
+                for j in range(len(base))
+                if j != idx and base[j] > (1 if ratios[j] > 0.0 else 0)
+            ]
+            if not donor_candidates:
+                donor_candidates = [j for j in range(len(base)) if j != idx and base[j] > 0]
+            if not donor_candidates:
+                continue
+
+            donor = max(donor_candidates, key=lambda j: base[j])
+            base[donor] -= 1
+            base[idx] += 1
 
     return dict(zip(_SPLITS, base, strict=True))
 
