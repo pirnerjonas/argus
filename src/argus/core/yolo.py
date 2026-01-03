@@ -118,8 +118,14 @@ class YOLODataset(Dataset):
         # Build class_id -> class_name mapping
         id_to_name = {i: name for i, name in enumerate(self.class_names)}
 
-        # Determine splits to process - use "unsplit" for flat structure
-        splits_to_process = self.splits if self.splits else ["unsplit"]
+        labels_root = self.path / "labels"
+        has_split_label_dirs = any((labels_root / s).is_dir() for s in self.splits)
+
+        # If splits are declared but no labels/{split} folders exist, treat as unsplit.
+        if self.splits and not has_split_label_dirs:
+            splits_to_process = ["unsplit"]
+        else:
+            splits_to_process = self.splits if self.splits else ["unsplit"]
 
         # Get label directories for each split
         for split in splits_to_process:
@@ -127,12 +133,9 @@ class YOLODataset(Dataset):
 
             # Find label directory for this split
             if split == "unsplit":
-                label_dir = self.path / "labels"
+                label_dir = labels_root
             else:
-                label_dir = self.path / "labels" / split
-                if not label_dir.is_dir():
-                    # Fallback to flat structure
-                    label_dir = self.path / "labels"
+                label_dir = labels_root / split
 
             if not label_dir.is_dir():
                 continue
@@ -173,24 +176,26 @@ class YOLODataset(Dataset):
         """
         counts: dict[str, dict[str, int]] = {}
 
-        # Determine splits to process - use "unsplit" for flat structure
-        splits_to_process = self.splits if self.splits else ["unsplit"]
+        labels_root = self.path / "labels"
+        has_split_label_dirs = any((labels_root / s).is_dir() for s in self.splits)
+
+        # If splits are declared but no labels/{split} folders exist, treat as unsplit.
+        if self.splits and not has_split_label_dirs:
+            splits_to_process = ["unsplit"]
+        else:
+            splits_to_process = self.splits if self.splits else ["unsplit"]
 
         for split in splits_to_process:
-            # Find label directory for this split
             if split == "unsplit":
-                label_dir = self.path / "labels"
+                label_dir = labels_root
             else:
-                label_dir = self.path / "labels" / split
-                if not label_dir.is_dir():
-                    label_dir = self.path / "labels"
+                label_dir = labels_root / split
 
             if not label_dir.is_dir():
                 continue
 
             total = 0
             background = 0
-
             for txt_file in label_dir.glob("*.txt"):
                 total += 1
                 try:
@@ -303,11 +308,19 @@ class YOLODataset(Dataset):
             List of image file paths sorted alphabetically.
         """
         image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+        images_root = self.path / "images"
         image_paths: list[Path] = []
+        seen: set[Path] = set()
 
-        # Determine which splits to search
+        # Decide how to interpret splits. If splits are declared but no images/{split}
+        # directories exist, treat the dataset as unsplit to avoid counting the same
+        # images multiple times.
+        has_split_image_dirs = any((images_root / s).is_dir() for s in self.splits)
+
         if split:
             splits_to_search = [split]
+        elif self.splits and not has_split_image_dirs:
+            splits_to_search = ["unsplit"]
         elif self.splits:
             splits_to_search = self.splits
         else:
@@ -315,16 +328,26 @@ class YOLODataset(Dataset):
 
         for s in splits_to_search:
             if s == "unsplit":
-                image_dir = self.path / "images"
+                image_dir = images_root
             else:
-                image_dir = self.path / "images" / s
+                image_dir = images_root / s
                 if not image_dir.is_dir():
-                    image_dir = self.path / "images"
+                    # If a split was explicitly requested but the folder doesn't
+                    # exist, fall back to images/.
+                    image_dir = images_root
 
-            if image_dir.is_dir():
-                for img_file in image_dir.iterdir():
-                    if img_file.suffix.lower() in image_extensions:
-                        image_paths.append(img_file)
+            if not image_dir.is_dir():
+                continue
+
+            for img_file in image_dir.iterdir():
+                if img_file.suffix.lower() not in image_extensions:
+                    continue
+
+                resolved = img_file.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                image_paths.append(img_file)
 
         return sorted(image_paths, key=lambda p: p.name)
 
