@@ -132,10 +132,7 @@ class YOLODataset(Dataset):
             split_counts: dict[str, int] = {}
 
             # Find label directory for this split
-            if split == "unsplit":
-                label_dir = labels_root
-            else:
-                label_dir = labels_root / split
+            label_dir = labels_root if split == "unsplit" else labels_root / split
 
             if not label_dir.is_dir():
                 continue
@@ -186,10 +183,7 @@ class YOLODataset(Dataset):
             splits_to_process = self.splits if self.splits else ["unsplit"]
 
         for split in splits_to_process:
-            if split == "unsplit":
-                label_dir = labels_root
-            else:
-                label_dir = labels_root / split
+            label_dir = labels_root if split == "unsplit" else labels_root / split
 
             if not label_dir.is_dir():
                 continue
