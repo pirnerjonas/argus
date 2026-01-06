@@ -18,6 +18,9 @@ dev = [
     "pytest-cov>=4.0.0",
     "ruff>=0.9.9",
 ]
+docs = [
+    "mkdocs-material>=9.5.0",
+]
 
 [project.scripts]
 argus = "argus.cli:app"
