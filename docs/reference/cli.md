@@ -61,7 +61,7 @@ argus split --dataset-path /datasets/animals \
 Options:
 
 - `--dataset-path`, `-d`: dataset root path
-- `--output-path`, `-o`: output directory
-- `--ratio`, `-r`: train/val/test ratio
-- `--stratify/--no-stratify`: enable or disable stratified splitting
-- `--seed`: random seed
+- `--output-path`, `-o`: output directory (default: "splits" inside dataset path)
+- `--ratio`, `-r`: train/val/test ratio (default: 0.8,0.1,0.1)
+- `--stratify/--no-stratify`: enable or disable stratified splitting (default: enabled)
+- `--seed`: random seed (default: 42)

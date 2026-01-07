@@ -11,18 +11,36 @@ uvx argus
 
 `uvx` runs the package in an isolated environment and keeps it up to date.
 
+Verify it works:
+
+```bash
+argus --help
+```
+
 ## pipx
 
 ```bash
 pipx install argus
 ```
 
+Verify it works:
+
+```bash
+argus --help
+```
+
 ## From source
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/pirnerjonas/argus
 cd argus
 pip install -e .
+```
+
+Verify it works:
+
+```bash
+argus --help
 ```
 
 ## Requirements

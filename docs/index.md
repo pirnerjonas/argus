@@ -77,4 +77,4 @@ commands will usually just work.
 
 Head to the formats guide for the full layouts and edge cases.
 
-[Explore dataset formats](guides/datasets/){ .md-button .md-button--primary }
+[Explore dataset formats](guides/datasets.md){ .md-button .md-button--primary }
