@@ -12,6 +12,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from argus.core import COCODataset, Dataset, YOLODataset
+from argus.core.background import add_background_to_coco, add_background_to_yolo
 from argus.core.split import (
     is_coco_unsplit,
     parse_ratio,
@@ -446,6 +447,114 @@ def split_dataset(
     console.print(
         "[green]Split complete.[/green] "
         f"Train: {counts['train']}, Val: {counts['val']}, Test: {counts['test']}."
+    )
+
+
+@app.command(name="add-background")
+def add_background(
+    dataset_path: Annotated[
+        Path,
+        typer.Option(
+            "--dataset-path",
+            "-d",
+            help="Path to the dataset root directory.",
+        ),
+    ] = Path("."),
+    source: Annotated[
+        Path,
+        typer.Option(
+            "--source",
+            "-s",
+            help="Path to image file or directory of background images.",
+        ),
+    ] = ...,
+    ratio: Annotated[
+        str,
+        typer.Option(
+            "--ratio",
+            "-r",
+            help="Train/val/test distribution ratio (e.g. 0.8,0.1,0.1).",
+        ),
+    ] = "0.8,0.1,0.1",
+    seed: Annotated[
+        int | None,
+        typer.Option(
+            "--seed",
+            help="Random seed for deterministic distribution.",
+        ),
+    ] = None,
+) -> None:
+    """Add background-only images to a dataset.
+
+    Copies images from the source to the dataset and creates empty annotation
+    entries (for YOLO: empty .txt files, for COCO: image entries with no annotations).
+
+    Images are distributed across splits according to the specified ratio.
+    If the dataset has no splits, all images are added to the root images/ folder.
+    """
+    # Resolve paths and validate
+    dataset_path = dataset_path.resolve()
+    source = source.resolve()
+
+    if not dataset_path.exists():
+        console.print(f"[red]Error: Dataset path does not exist: {dataset_path}[/red]")
+        raise typer.Exit(1)
+    if not dataset_path.is_dir():
+        console.print(
+            f"[red]Error: Dataset path is not a directory: {dataset_path}[/red]"
+        )
+        raise typer.Exit(1)
+    if not source.exists():
+        console.print(f"[red]Error: Source path does not exist: {source}[/red]")
+        raise typer.Exit(1)
+
+    # Detect dataset
+    dataset = _detect_dataset(dataset_path)
+    if not dataset:
+        console.print(
+            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            "[yellow]Ensure the path points to a dataset root containing "
+            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Parse ratio
+    try:
+        ratios = parse_ratio(ratio)
+    except ValueError as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    # Add background images
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        progress.add_task("Adding background images...", total=None)
+        try:
+            if isinstance(dataset, YOLODataset):
+                counts = add_background_to_yolo(dataset, source, ratios, seed)
+            elif isinstance(dataset, COCODataset):
+                counts = add_background_to_coco(dataset, source, ratios, seed)
+            else:
+                console.print("[red]Error: Unsupported dataset type.[/red]")
+                raise typer.Exit(1)
+        except ValueError as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+            raise typer.Exit(1) from exc
+
+    # Report results
+    total_added = sum(counts.values())
+    if total_added == 0:
+        console.print("[yellow]No images were added.[/yellow]")
+        return
+
+    parts = [f"{split}: {count}" for split, count in counts.items() if count > 0]
+    console.print(
+        f"[green]Added {total_added} background image(s).[/green] "
+        f"{', '.join(parts)}."
     )
 
 
