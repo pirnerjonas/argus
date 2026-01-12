@@ -5,13 +5,13 @@ The viewer overlays boxes and masks for quick spot checks.
 ## Launching the viewer
 
 ```bash
-argus view -d /datasets/retail
+argus-cv view -d /datasets/retail
 ```
 
 ### View a specific split
 
 ```bash
-argus view -d /datasets/retail --split val
+argus-cv view -d /datasets/retail --split val
 ```
 
 ## Controls

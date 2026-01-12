@@ -5,7 +5,7 @@ Point Argus at a dataset root. It will detect YOLO or COCO automatically.
 ## 1. List datasets under a directory
 
 ```bash
-argus list --path /datasets
+argus-cv list --path /datasets
 ```
 
 You will get a table with format, task, classes, and splits.
@@ -13,7 +13,7 @@ You will get a table with format, task, classes, and splits.
 ## 2. Inspect class balance and background images
 
 ```bash
-argus stats -d /datasets/traffic
+argus-cv stats -d /datasets/traffic
 ```
 
 This prints per-class counts per split and a summary line with image totals.
@@ -21,7 +21,7 @@ This prints per-class counts per split and a summary line with image totals.
 ## 3. Visual inspection
 
 ```bash
-argus view -d /datasets/traffic --split val
+argus-cv view -d /datasets/traffic --split val
 ```
 
 Controls inside the viewer:
@@ -36,7 +36,7 @@ Controls inside the viewer:
 ## 4. Split an unsplit dataset
 
 ```bash
-argus split -d /datasets/traffic -o /datasets/traffic_splits -r 0.8,0.1,0.1
+argus-cv split -d /datasets/traffic -o /datasets/traffic_splits -r 0.8,0.1,0.1
 ```
 
 This writes the split dataset to the output path and prints counts for each

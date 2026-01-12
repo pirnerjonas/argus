@@ -13,7 +13,7 @@ Argus uses subcommands: `list`, `stats`, `view`, and `split`.
 Scan a directory tree and report detected datasets.
 
 ```bash
-argus list --path . --max-depth 3
+argus-cv list --path . --max-depth 3
 ```
 
 Options:
@@ -26,7 +26,7 @@ Options:
 Show instance counts per class and per split.
 
 ```bash
-argus stats --dataset-path /datasets/retail
+argus-cv stats --dataset-path /datasets/retail
 ```
 
 Options:
@@ -38,7 +38,7 @@ Options:
 Launch an interactive annotation viewer.
 
 ```bash
-argus view --dataset-path /datasets/retail --split val
+argus-cv view --dataset-path /datasets/retail --split val
 ```
 
 Options:
@@ -51,7 +51,7 @@ Options:
 Create train/val/test splits from an unsplit dataset.
 
 ```bash
-argus split --dataset-path /datasets/animals \
+argus-cv split --dataset-path /datasets/animals \
   --output-path /datasets/animals_splits \
   --ratio 0.8,0.1,0.1 \
   --stratify \

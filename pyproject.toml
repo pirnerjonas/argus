@@ -25,7 +25,7 @@ docs = [
 ]
 
 [project.scripts]
-argus = "argus.cli:app"
+argus-cv = "argus.cli:app"
 
 [build-system]
 requires = ["hatchling"]

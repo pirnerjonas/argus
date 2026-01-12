@@ -1,11 +1,11 @@
 # Stats and counts
 
-`argus stats` provides per-class instance counts and image totals by split.
+`argus-cv stats` provides per-class instance counts and image totals by split.
 
 ## Example
 
 ```bash
-argus stats -d /datasets/retail
+argus-cv stats -d /datasets/retail
 ```
 
 Argus prints a table by class and split. It also includes a summary with:

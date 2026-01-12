@@ -15,13 +15,13 @@
 
 ```bash
 # Discover datasets
-argus list --path /data
+argus-cv list --path /data
 
 # Instant class stats
-argus stats -d /data/animals
+argus-cv stats -d /data/animals
 
 # Visual inspection
-argus view -d /data/animals --split val
+argus-cv view -d /data/animals --split val
 ```
 
   </div>
@@ -51,20 +51,20 @@ argus view -d /data/animals --split val
 === "Quick scan"
 
     ```bash
-    argus list --path /datasets
-    argus stats -d /datasets/retail
+    argus-cv list --path /datasets
+    argus-cv stats -d /datasets/retail
     ```
 
 === "Find label issues"
 
     ```bash
-    argus view -d /datasets/retail --split val
+    argus-cv view -d /datasets/retail --split val
     ```
 
 === "Create splits"
 
     ```bash
-    argus split -d /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
+    argus-cv split -d /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
     ```
 
 ## What Argus expects
