@@ -1,11 +1,11 @@
 # Listing datasets
 
-Use `argus list` to scan a directory tree and discover datasets.
+Use `argus-cv list` to scan a directory tree and discover datasets.
 
 ## Basic listing
 
 ```bash
-argus list --path /datasets
+argus-cv list --path /datasets
 ```
 
 This prints a table showing:
@@ -19,7 +19,7 @@ This prints a table showing:
 ## Control scan depth
 
 ```bash
-argus list --path /datasets --max-depth 2
+argus-cv list --path /datasets --max-depth 2
 ```
 
 This keeps scans fast when you have many nested projects.
