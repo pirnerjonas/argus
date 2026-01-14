@@ -507,8 +507,10 @@ class _ImageViewer:
 
         if self.show_annotations:
             img = self.annotated_img
+        elif self.current_img is not None:
+            img = self.current_img
         else:
-            img = self.current_img if self.current_img is not None else self.annotated_img
+            img = self.annotated_img
         h, w = img.shape[:2]
 
         if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
