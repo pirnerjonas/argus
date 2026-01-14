@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-01-14)
+
+### Code Style
+
+- Fix line too long in _get_display_image
+  ([`7a56904`](https://github.com/pirnerjonas/argus/commit/7a569049baa4e90956e089d970e192eb159a57e0))
+
+### Features
+
+- Add toggle for annotation overlay in view command
+  ([`65fb239`](https://github.com/pirnerjonas/argus/commit/65fb23942d53947df57b6e4c12d11e5dd1aa98f3))
+
+
 ## v1.0.1 (2026-01-12)
 
 ### Bug Fixes
