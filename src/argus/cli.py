@@ -250,6 +250,7 @@ def view(
         - Mouse Wheel: Zoom in/out
         - Mouse Drag: Pan when zoomed
         - R: Reset zoom
+        - T: Toggle annotations
         - Q / ESC: Quit viewer
     """
     # Resolve path and validate
@@ -298,7 +299,8 @@ def view(
         f"[green]Found {len(image_paths)} images. "
         f"Opening viewer...[/green]\n"
         "[dim]Controls: ← / → or P / N to navigate, "
-        "Mouse wheel to zoom, Drag to pan, R to reset, Q / ESC to quit[/dim]"
+        "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle annotations, "
+        "Q / ESC to quit[/dim]"
     )
 
     # Generate consistent colors for each class
@@ -480,6 +482,9 @@ class _ImageViewer:
         self.current_img: np.ndarray | None = None
         self.annotated_img: np.ndarray | None = None
 
+        # Annotation visibility toggle
+        self.show_annotations = True
+
     def _load_current_image(self) -> bool:
         """Load and annotate the current image."""
         image_path = self.image_paths[self.current_idx]
@@ -500,7 +505,12 @@ class _ImageViewer:
         if self.annotated_img is None:
             return np.zeros((480, 640, 3), dtype=np.uint8)
 
-        img = self.annotated_img
+        if self.show_annotations:
+            img = self.annotated_img
+        elif self.current_img is not None:
+            img = self.current_img
+        else:
+            img = self.annotated_img
         h, w = img.shape[:2]
 
         if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
@@ -537,6 +547,8 @@ class _ImageViewer:
         info_text = f"[{idx}/{total}] {image_path.name}"
         if self.zoom > 1.0:
             info_text += f" (Zoom: {self.zoom:.1f}x)"
+        if not self.show_annotations:
+            info_text += " [Annotations: OFF]"
 
         cv2.putText(
             display, info_text, (10, 30),
@@ -638,6 +650,8 @@ class _ImageViewer:
                 self._prev_image()
             elif key == ord("r"):  # R to reset zoom
                 self._reset_view()
+            elif key == ord("t"):  # T to toggle annotations
+                self.show_annotations = not self.show_annotations
 
         cv2.destroyAllWindows()
 
