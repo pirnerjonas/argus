@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from argus.core.base import DatasetFormat, TaskType
 from argus.core.yolo import YOLODataset
 
