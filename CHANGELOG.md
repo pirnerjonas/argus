@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-01-15)
+
+### Code Style
+
+- Fix ruff linting errors
+  ([`b2d5ea2`](https://github.com/pirnerjonas/argus/commit/b2d5ea2c4d0715a474d4ffaa5be60d0499d200a2))
+
+- Remove unused pytest import in test_classification.py
+  ([`e22175a`](https://github.com/pirnerjonas/argus/commit/e22175a7378276dd2840754e672c7d4d1ed0e067))
+
+### Features
+
+- Add classification dataset support with grid viewer
+  ([`8089bd3`](https://github.com/pirnerjonas/argus/commit/8089bd3367ede4c288b0276ac3da4d3ef9960c4d))
+
+
 ## v1.1.0 (2026-01-14)
 
 ### Code Style
