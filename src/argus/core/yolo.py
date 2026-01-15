@@ -12,9 +12,9 @@ from argus.core.base import Dataset, DatasetFormat, TaskType
 class YOLODataset(Dataset):
     """YOLO format dataset.
 
-    Supports detection and segmentation tasks.
+    Supports detection, segmentation, and classification tasks.
 
-    Structure:
+    Structure (detection/segmentation):
         dataset/
         ├── data.yaml (or *.yaml/*.yml with 'names' key)
         ├── images/
@@ -23,6 +23,19 @@ class YOLODataset(Dataset):
         └── labels/
             ├── train/
             └── val/
+
+    Structure (classification):
+        dataset/
+        ├── images/
+        │   ├── train/
+        │   │   ├── class1/
+        │   │   │   ├── img1.jpg
+        │   │   │   └── img2.jpg
+        │   │   └── class2/
+        │   │       └── img1.jpg
+        │   └── val/
+        │       ├── class1/
+        │       └── class2/
     """
 
     config_file: Path | None = None
@@ -43,8 +56,13 @@ class YOLODataset(Dataset):
         if not path.is_dir():
             return None
 
-        # Try detection/segmentation (YAML-based)
-        return cls._detect_yaml_based(path)
+        # Try detection/segmentation (YAML-based) first
+        result = cls._detect_yaml_based(path)
+        if result:
+            return result
+
+        # Try classification (directory-based structure)
+        return cls._detect_classification(path)
 
     @classmethod
     def _detect_yaml_based(cls, path: Path) -> "YOLODataset | None":
@@ -103,16 +121,121 @@ class YOLODataset(Dataset):
 
         return None
 
+    @classmethod
+    def _detect_classification(cls, path: Path) -> "YOLODataset | None":
+        """Detect classification dataset from directory structure.
+
+        Classification datasets can have two structures:
+
+        1. Split structure:
+            images/{split}/class_name/image.jpg
+
+        2. Flat structure (unsplit):
+            class_name/image.jpg
+
+        No YAML config required - class names inferred from directory names.
+
+        Args:
+            path: Directory path to check.
+
+        Returns:
+            YOLODataset if classification structure found, None otherwise.
+        """
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+
+        # Try split structure first: images/{split}/class/
+        images_root = path / "images"
+        if images_root.is_dir():
+            splits: list[str] = []
+            class_names_set: set[str] = set()
+
+            for split_name in ["train", "val", "test"]:
+                split_dir = images_root / split_name
+                if not split_dir.is_dir():
+                    continue
+
+                # Get subdirectories (potential class folders)
+                class_dirs = [d for d in split_dir.iterdir() if d.is_dir()]
+                if not class_dirs:
+                    continue
+
+                # Check if at least one class dir contains images
+                has_images = False
+                for class_dir in class_dirs:
+                    for f in class_dir.iterdir():
+                        if f.suffix.lower() in image_extensions:
+                            has_images = True
+                            break
+                    if has_images:
+                        break
+
+                if has_images:
+                    splits.append(split_name)
+                    class_names_set.update(d.name for d in class_dirs)
+
+            if splits and class_names_set:
+                class_names = sorted(class_names_set)
+                return cls(
+                    path=path,
+                    task=TaskType.CLASSIFICATION,
+                    num_classes=len(class_names),
+                    class_names=class_names,
+                    splits=splits,
+                    config_file=None,
+                )
+
+        # Try flat structure: class_name/image.jpg (no images/ or split dirs)
+        # Check if root contains subdirectories with images
+        class_dirs = [d for d in path.iterdir() if d.is_dir()]
+
+        # Filter out common non-class directories
+        excluded_dirs = {"images", "labels", "annotations", ".git", "__pycache__"}
+        class_dirs = [d for d in class_dirs if d.name not in excluded_dirs]
+
+        if not class_dirs:
+            return None
+
+        # Check if these are class directories (contain images directly)
+        class_names_set = set()
+        for class_dir in class_dirs:
+            has_images = any(
+                f.suffix.lower() in image_extensions
+                for f in class_dir.iterdir()
+                if f.is_file()
+            )
+            if has_images:
+                class_names_set.add(class_dir.name)
+
+        # Need at least 2 classes to be a valid classification dataset
+        if len(class_names_set) < 2:
+            return None
+
+        class_names = sorted(class_names_set)
+        return cls(
+            path=path,
+            task=TaskType.CLASSIFICATION,
+            num_classes=len(class_names),
+            class_names=class_names,
+            splits=[],  # No splits for flat structure
+            config_file=None,
+        )
+
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
         """Get the number of annotation instances per class, per split.
 
-        Parses all label files in labels/{split}/*.txt and counts
-        occurrences of each class ID. For unsplit datasets, uses "unsplit"
-        as the split name.
+        For detection/segmentation: Parses all label files in labels/{split}/*.txt
+        and counts occurrences of each class ID.
+
+        For classification: Counts images in each class directory
+        (1 image = 1 instance).
 
         Returns:
             Dictionary mapping split name to dict of class name to instance count.
         """
+        # Handle classification datasets differently
+        if self.task == TaskType.CLASSIFICATION:
+            return self._get_classification_instance_counts()
+
         counts: dict[str, dict[str, int]] = {}
 
         # Build class_id -> class_name mapping
@@ -162,15 +285,77 @@ class YOLODataset(Dataset):
 
         return counts
 
+    def _get_classification_instance_counts(self) -> dict[str, dict[str, int]]:
+        """Get instance counts for classification datasets.
+
+        Each image is one instance of its class.
+
+        Returns:
+            Dictionary mapping split name to dict of class name to image count.
+        """
+        counts: dict[str, dict[str, int]] = {}
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+
+        # Handle flat structure (no splits)
+        if not self.splits:
+            split_counts: dict[str, int] = {}
+            for class_name in self.class_names:
+                class_dir = self.path / class_name
+                if not class_dir.is_dir():
+                    split_counts[class_name] = 0
+                    continue
+
+                image_count = sum(
+                    1
+                    for f in class_dir.iterdir()
+                    if f.suffix.lower() in image_extensions
+                )
+                split_counts[class_name] = image_count
+
+            counts["unsplit"] = split_counts
+            return counts
+
+        # Handle split structure
+        images_root = self.path / "images"
+        for split in self.splits:
+            split_dir = images_root / split
+            if not split_dir.is_dir():
+                continue
+
+            split_counts = {}
+            for class_name in self.class_names:
+                class_dir = split_dir / class_name
+                if not class_dir.is_dir():
+                    split_counts[class_name] = 0
+                    continue
+
+                image_count = sum(
+                    1
+                    for f in class_dir.iterdir()
+                    if f.suffix.lower() in image_extensions
+                )
+                split_counts[class_name] = image_count
+
+            counts[split] = split_counts
+
+        return counts
+
     def get_image_counts(self) -> dict[str, dict[str, int]]:
         """Get image counts per split, including background images.
 
-        Counts label files in labels/{split}/*.txt. Empty files are
-        counted as background images.
+        For detection/segmentation: Counts label files in labels/{split}/*.txt.
+        Empty files are counted as background images.
+
+        For classification: Counts total images across all class directories.
+        Background count is always 0 (no background concept in classification).
 
         Returns:
             Dictionary mapping split name to dict with "total" and "background" counts.
         """
+        # Handle classification datasets differently
+        if self.task == TaskType.CLASSIFICATION:
+            return self._get_classification_image_counts()
+
         counts: dict[str, dict[str, int]] = {}
 
         labels_root = self.path / "labels"
@@ -200,6 +385,56 @@ class YOLODataset(Dataset):
                     continue
 
             counts[split] = {"total": total, "background": background}
+
+        return counts
+
+    def _get_classification_image_counts(self) -> dict[str, dict[str, int]]:
+        """Get image counts for classification datasets.
+
+        Returns:
+            Dictionary mapping split name to dict with "total" and "background" counts.
+            Background is always 0 for classification.
+        """
+        counts: dict[str, dict[str, int]] = {}
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+
+        # Handle flat structure (no splits)
+        if not self.splits:
+            total = 0
+            for class_name in self.class_names:
+                class_dir = self.path / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                total += sum(
+                    1
+                    for f in class_dir.iterdir()
+                    if f.suffix.lower() in image_extensions
+                )
+
+            counts["unsplit"] = {"total": total, "background": 0}
+            return counts
+
+        # Handle split structure
+        images_root = self.path / "images"
+        for split in self.splits:
+            split_dir = images_root / split
+            if not split_dir.is_dir():
+                continue
+
+            total = 0
+            for class_name in self.class_names:
+                class_dir = split_dir / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                total += sum(
+                    1
+                    for f in class_dir.iterdir()
+                    if f.suffix.lower() in image_extensions
+                )
+
+            counts[split] = {"total": total, "background": 0}
 
         return counts
 
@@ -301,6 +536,10 @@ class YOLODataset(Dataset):
         Returns:
             List of image file paths sorted alphabetically.
         """
+        # Handle classification datasets differently
+        if self.task == TaskType.CLASSIFICATION:
+            return self._get_classification_image_paths(split)
+
         image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         images_root = self.path / "images"
         image_paths: list[Path] = []
@@ -342,6 +581,54 @@ class YOLODataset(Dataset):
                     continue
                 seen.add(resolved)
                 image_paths.append(img_file)
+
+        return sorted(image_paths, key=lambda p: p.name)
+
+    def _get_classification_image_paths(self, split: str | None = None) -> list[Path]:
+        """Get image paths for classification datasets.
+
+        Args:
+            split: Specific split to get images from. If None, returns all images.
+
+        Returns:
+            List of image file paths sorted alphabetically.
+        """
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+        image_paths: list[Path] = []
+
+        # Handle flat structure (no splits)
+        if not self.splits:
+            for class_name in self.class_names:
+                class_dir = self.path / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                for img_file in class_dir.iterdir():
+                    if img_file.suffix.lower() in image_extensions:
+                        image_paths.append(img_file)
+
+            return sorted(image_paths, key=lambda p: p.name)
+
+        # Handle split structure
+        images_root = self.path / "images"
+        if split:
+            splits_to_search = [split]
+        else:
+            splits_to_search = self.splits
+
+        for s in splits_to_search:
+            split_dir = images_root / s
+            if not split_dir.is_dir():
+                continue
+
+            for class_name in self.class_names:
+                class_dir = split_dir / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                for img_file in class_dir.iterdir():
+                    if img_file.suffix.lower() in image_extensions:
+                        image_paths.append(img_file)
 
         return sorted(image_paths, key=lambda p: p.name)
 
@@ -445,3 +732,67 @@ class YOLODataset(Dataset):
             pass
 
         return annotations
+
+    def get_images_by_class(self, split: str | None = None) -> dict[str, list[Path]]:
+        """Get images grouped by class for classification datasets.
+
+        Args:
+            split: Specific split to get images from. If None, uses first available split
+                   or all images for flat structure.
+
+        Returns:
+            Dictionary mapping class name to list of image paths.
+        """
+        if self.task != TaskType.CLASSIFICATION:
+            return {}
+
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+        images_by_class: dict[str, list[Path]] = {cls: [] for cls in self.class_names}
+
+        # Handle flat structure (no splits)
+        if not self.splits:
+            for class_name in self.class_names:
+                class_dir = self.path / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                for img_file in class_dir.iterdir():
+                    if img_file.suffix.lower() in image_extensions:
+                        images_by_class[class_name].append(img_file)
+
+            # Sort images within each class
+            for class_name in images_by_class:
+                images_by_class[class_name] = sorted(
+                    images_by_class[class_name], key=lambda p: p.name
+                )
+
+            return images_by_class
+
+        # Handle split structure
+        images_root = self.path / "images"
+        if split:
+            splits_to_search = [split]
+        else:
+            splits_to_search = self.splits[:1] if self.splits else []
+
+        for s in splits_to_search:
+            split_dir = images_root / s
+            if not split_dir.is_dir():
+                continue
+
+            for class_name in self.class_names:
+                class_dir = split_dir / class_name
+                if not class_dir.is_dir():
+                    continue
+
+                for img_file in class_dir.iterdir():
+                    if img_file.suffix.lower() in image_extensions:
+                        images_by_class[class_name].append(img_file)
+
+        # Sort images within each class for consistent ordering
+        for class_name in images_by_class:
+            images_by_class[class_name] = sorted(
+                images_by_class[class_name], key=lambda p: p.name
+            )
+
+        return images_by_class

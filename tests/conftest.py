@@ -389,3 +389,74 @@ names:
     (annotations_dir / "annotations.json").write_text(json.dumps(coco_data))
 
     return root_path
+
+
+@pytest.fixture
+def yolo_classification_dataset(tmp_path: Path) -> Path:
+    """Create a valid YOLO classification dataset.
+
+    Structure:
+        dataset/
+        └── images/
+            ├── train/
+            │   ├── cat/
+            │   │   ├── img001.jpg
+            │   │   └── img002.jpg
+            │   └── dog/
+            │       └── img001.jpg
+            └── val/
+                ├── cat/
+                │   └── img001.jpg
+                └── dog/
+                    └── img001.jpg
+    """
+    dataset_path = tmp_path / "yolo_classification"
+    dataset_path.mkdir()
+
+    # Create directory structure with class subdirectories
+    (dataset_path / "images" / "train" / "cat").mkdir(parents=True)
+    (dataset_path / "images" / "train" / "dog").mkdir(parents=True)
+    (dataset_path / "images" / "val" / "cat").mkdir(parents=True)
+    (dataset_path / "images" / "val" / "dog").mkdir(parents=True)
+
+    # Create dummy images in each class directory
+    # Train split
+    (dataset_path / "images" / "train" / "cat" / "img001.jpg").write_bytes(b"fake cat")
+    (dataset_path / "images" / "train" / "cat" / "img002.jpg").write_bytes(b"fake cat")
+    (dataset_path / "images" / "train" / "dog" / "img001.jpg").write_bytes(b"fake dog")
+
+    # Val split
+    (dataset_path / "images" / "val" / "cat" / "img001.jpg").write_bytes(b"fake cat")
+    (dataset_path / "images" / "val" / "dog" / "img001.jpg").write_bytes(b"fake dog")
+
+    return dataset_path
+
+
+@pytest.fixture
+def yolo_classification_multiclass_dataset(tmp_path: Path) -> Path:
+    """Create a YOLO classification dataset with more classes.
+
+    Structure:
+        dataset/
+        └── images/
+            └── train/
+                ├── class1/
+                ├── class2/
+                ├── class3/
+                └── class4/
+    """
+    dataset_path = tmp_path / "yolo_cls_multiclass"
+    dataset_path.mkdir()
+
+    classes = ["apple", "banana", "cherry", "date"]
+
+    for cls in classes:
+        (dataset_path / "images" / "train" / cls).mkdir(parents=True)
+        # Add varying number of images per class
+        num_images = classes.index(cls) + 1
+        for i in range(num_images):
+            (dataset_path / "images" / "train" / cls / f"img{i:03d}.jpg").write_bytes(
+                b"fake image"
+            )
+
+    return dataset_path

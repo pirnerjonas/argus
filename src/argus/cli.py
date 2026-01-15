@@ -12,6 +12,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from argus.core import COCODataset, Dataset, YOLODataset
+from argus.core.base import TaskType
 from argus.core.split import (
     is_coco_unsplit,
     parse_ratio,
@@ -238,19 +239,29 @@ def view(
             help="Specific split to view (train, val, test).",
         ),
     ] = None,
+    max_classes: Annotated[
+        int | None,
+        typer.Option(
+            "--max-classes",
+            "-m",
+            help="Maximum classes to show in grid (classification only).",
+        ),
+    ] = None,
 ) -> None:
     """View annotated images in a dataset.
 
     Opens an interactive viewer to browse images with their annotations
     (bounding boxes and segmentation masks) overlaid.
 
+    For classification datasets, shows a grid view with one image per class.
+
     Controls:
-        - Right Arrow / N: Next image
-        - Left Arrow / P: Previous image
-        - Mouse Wheel: Zoom in/out
-        - Mouse Drag: Pan when zoomed
-        - R: Reset zoom
-        - T: Toggle annotations
+        - Right Arrow / N: Next image(s)
+        - Left Arrow / P: Previous image(s)
+        - Mouse Wheel: Zoom in/out (detection/segmentation only)
+        - Mouse Drag: Pan when zoomed (detection/segmentation only)
+        - R: Reset zoom / Reset to first images
+        - T: Toggle annotations (detection/segmentation only)
         - Q / ESC: Quit viewer
     """
     # Resolve path and validate
@@ -281,39 +292,76 @@ def view(
         )
         raise typer.Exit(1)
 
-    # Get image paths
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-        transient=True,
-    ) as progress:
-        progress.add_task("Loading images...", total=None)
-        image_paths = dataset.get_image_paths(split)
-
-    if not image_paths:
-        console.print("[yellow]No images found in the dataset.[/yellow]")
-        return
-
-    console.print(
-        f"[green]Found {len(image_paths)} images. "
-        f"Opening viewer...[/green]\n"
-        "[dim]Controls: ← / → or P / N to navigate, "
-        "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle annotations, "
-        "Q / ESC to quit[/dim]"
-    )
-
     # Generate consistent colors for each class
     class_colors = _generate_class_colors(dataset.class_names)
 
-    # Create and run the interactive viewer
-    viewer = _ImageViewer(
-        image_paths=image_paths,
-        dataset=dataset,
-        class_colors=class_colors,
-        window_name=f"Argus Viewer - {dataset_path.name}",
-    )
-    viewer.run()
+    # Handle classification datasets with grid viewer
+    if dataset.task == TaskType.CLASSIFICATION:
+        # Use first split if specified, otherwise let get_images_by_class handle it
+        view_split = split if split else (dataset.splits[0] if dataset.splits else None)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task("Loading images by class...", total=None)
+            images_by_class = dataset.get_images_by_class(view_split)
+
+        total_images = sum(len(imgs) for imgs in images_by_class.values())
+        if total_images == 0:
+            console.print("[yellow]No images found in the dataset.[/yellow]")
+            return
+
+        num_classes = len(dataset.class_names)
+        display_classes = min(num_classes, max_classes) if max_classes else num_classes
+
+        console.print(
+            f"[green]Found {total_images} images across {num_classes} classes "
+            f"(showing {display_classes}). Opening grid viewer...[/green]\n"
+            "[dim]Controls: ← / → or P / N to navigate all classes, "
+            "R to reset, Q / ESC to quit[/dim]"
+        )
+
+        viewer = _ClassificationGridViewer(
+            images_by_class=images_by_class,
+            class_names=dataset.class_names,
+            class_colors=class_colors,
+            window_name=f"Argus Classification Viewer - {dataset_path.name}",
+            max_classes=max_classes,
+        )
+        viewer.run()
+    else:
+        # Detection/Segmentation viewer
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task("Loading images...", total=None)
+            image_paths = dataset.get_image_paths(split)
+
+        if not image_paths:
+            console.print("[yellow]No images found in the dataset.[/yellow]")
+            return
+
+        console.print(
+            f"[green]Found {len(image_paths)} images. "
+            f"Opening viewer...[/green]\n"
+            "[dim]Controls: ← / → or P / N to navigate, "
+            "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle annotations, "
+            "Q / ESC to quit[/dim]"
+        )
+
+        viewer = _ImageViewer(
+            image_paths=image_paths,
+            dataset=dataset,
+            class_colors=class_colors,
+            window_name=f"Argus Viewer - {dataset_path.name}",
+        )
+        viewer.run()
 
     console.print("[green]Viewer closed.[/green]")
 
@@ -652,6 +700,179 @@ class _ImageViewer:
                 self._reset_view()
             elif key == ord("t"):  # T to toggle annotations
                 self.show_annotations = not self.show_annotations
+
+        cv2.destroyAllWindows()
+
+
+class _ClassificationGridViewer:
+    """Grid viewer for classification datasets showing one image per class."""
+
+    def __init__(
+        self,
+        images_by_class: dict[str, list[Path]],
+        class_names: list[str],
+        class_colors: dict[str, tuple[int, int, int]],
+        window_name: str,
+        max_classes: int | None = None,
+        tile_size: int = 300,
+    ):
+        # Limit classes if max_classes specified
+        if max_classes and len(class_names) > max_classes:
+            self.class_names = class_names[:max_classes]
+        else:
+            self.class_names = class_names
+
+        self.images_by_class = {
+            cls: images_by_class.get(cls, []) for cls in self.class_names
+        }
+        self.class_colors = class_colors
+        self.window_name = window_name
+        self.tile_size = tile_size
+
+        # Global image index (same for all classes)
+        self.current_index = 0
+
+        # Calculate max images across all classes
+        self.max_images = max(
+            len(imgs) for imgs in self.images_by_class.values()
+        ) if self.images_by_class else 0
+
+        # Calculate grid layout
+        self.cols, self.rows = self._calculate_grid_layout()
+
+    def _calculate_grid_layout(self) -> tuple[int, int]:
+        """Calculate optimal grid layout based on number of classes."""
+        n = len(self.class_names)
+        if n <= 0:
+            return 1, 1
+
+        # Try to make a roughly square grid
+        import math
+
+        cols = int(math.ceil(math.sqrt(n)))
+        rows = int(math.ceil(n / cols))
+        return cols, rows
+
+    def _create_tile(
+        self, class_name: str, image_path: Path | None, index: int, total: int
+    ) -> np.ndarray:
+        """Create a single tile for a class."""
+        tile = np.zeros((self.tile_size, self.tile_size, 3), dtype=np.uint8)
+
+        if image_path is not None and image_path.exists():
+            # Load and resize image
+            img = cv2.imread(str(image_path))
+            if img is not None:
+                # Resize maintaining aspect ratio
+                h, w = img.shape[:2]
+                scale = min(self.tile_size / w, self.tile_size / h)
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+                resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+                # Center in tile
+                x_offset = (self.tile_size - new_w) // 2
+                y_offset = (self.tile_size - new_h) // 2
+                tile[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
+
+        # Draw label at top: "class_name (N/M)"
+        if image_path is not None:
+            label = f"{class_name} ({index + 1}/{total})"
+        else:
+            label = f"{class_name} (-/{total})"
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        thickness = 1
+        (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+
+        # Semi-transparent background for label
+        overlay = tile.copy()
+        cv2.rectangle(overlay, (0, 0), (self.tile_size, label_h + baseline + 10), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.6, tile, 0.4, 0, tile)
+
+        cv2.putText(
+            tile,
+            label,
+            (5, label_h + 5),
+            font,
+            font_scale,
+            (255, 255, 255),
+            thickness,
+        )
+
+        # Draw thin border
+        cv2.rectangle(tile, (0, 0), (self.tile_size - 1, self.tile_size - 1), (80, 80, 80), 1)
+
+        return tile
+
+    def _compose_grid(self) -> np.ndarray:
+        """Compose all tiles into a single grid image."""
+        grid_h = self.rows * self.tile_size
+        grid_w = self.cols * self.tile_size
+        grid = np.zeros((grid_h, grid_w, 3), dtype=np.uint8)
+
+        for i, class_name in enumerate(self.class_names):
+            row = i // self.cols
+            col = i % self.cols
+
+            images = self.images_by_class[class_name]
+            total = len(images)
+
+            # Use global index - show black tile if class doesn't have this image
+            if self.current_index < total:
+                image_path = images[self.current_index]
+                display_index = self.current_index
+            else:
+                image_path = None
+                display_index = self.current_index
+
+            tile = self._create_tile(class_name, image_path, display_index, total)
+
+            y_start = row * self.tile_size
+            x_start = col * self.tile_size
+            grid[y_start : y_start + self.tile_size, x_start : x_start + self.tile_size] = tile
+
+        return grid
+
+    def _next_images(self) -> None:
+        """Advance to next image index."""
+        if self.max_images > 0:
+            self.current_index = min(self.current_index + 1, self.max_images - 1)
+
+    def _prev_images(self) -> None:
+        """Go back to previous image index."""
+        self.current_index = max(self.current_index - 1, 0)
+
+    def _reset_indices(self) -> None:
+        """Reset to first image."""
+        self.current_index = 0
+
+    def run(self) -> None:
+        """Run the interactive grid viewer."""
+        if not self.class_names:
+            console.print("[yellow]No classes to display.[/yellow]")
+            return
+
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+
+        while True:
+            # Compose and display grid
+            grid = self._compose_grid()
+            cv2.imshow(self.window_name, grid)
+
+            # Wait for input
+            key = cv2.waitKey(30) & 0xFF
+
+            # Handle keyboard input
+            if key == ord("q") or key == 27:  # Q or ESC
+                break
+            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
+                self._next_images()
+            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
+                self._prev_images()
+            elif key == ord("r"):  # R to reset
+                self._reset_indices()
 
         cv2.destroyAllWindows()
 
