@@ -784,11 +784,14 @@ class _ClassificationGridViewer:
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.5
         thickness = 1
-        (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+        (label_w, label_h), baseline = cv2.getTextSize(
+            label, font, font_scale, thickness
+        )
 
         # Semi-transparent background for label
         overlay = tile.copy()
-        cv2.rectangle(overlay, (0, 0), (self.tile_size, label_h + baseline + 10), (0, 0, 0), -1)
+        label_bg_height = label_h + baseline + 10
+        cv2.rectangle(overlay, (0, 0), (self.tile_size, label_bg_height), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.6, tile, 0.4, 0, tile)
 
         cv2.putText(
@@ -802,7 +805,8 @@ class _ClassificationGridViewer:
         )
 
         # Draw thin border
-        cv2.rectangle(tile, (0, 0), (self.tile_size - 1, self.tile_size - 1), (80, 80, 80), 1)
+        border_end = self.tile_size - 1
+        cv2.rectangle(tile, (0, 0), (border_end, border_end), (80, 80, 80), 1)
 
         return tile
 
@@ -831,7 +835,9 @@ class _ClassificationGridViewer:
 
             y_start = row * self.tile_size
             x_start = col * self.tile_size
-            grid[y_start : y_start + self.tile_size, x_start : x_start + self.tile_size] = tile
+            y_end = y_start + self.tile_size
+            x_end = x_start + self.tile_size
+            grid[y_start:y_end, x_start:x_end] = tile
 
         return grid
 

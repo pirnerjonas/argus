@@ -611,10 +611,7 @@ class YOLODataset(Dataset):
 
         # Handle split structure
         images_root = self.path / "images"
-        if split:
-            splits_to_search = [split]
-        else:
-            splits_to_search = self.splits
+        splits_to_search = [split] if split else self.splits
 
         for s in splits_to_search:
             split_dir = images_root / s
@@ -737,8 +734,8 @@ class YOLODataset(Dataset):
         """Get images grouped by class for classification datasets.
 
         Args:
-            split: Specific split to get images from. If None, uses first available split
-                   or all images for flat structure.
+            split: Specific split to get images from. If None, uses first
+                   available split or all images for flat structure.
 
         Returns:
             Dictionary mapping class name to list of image paths.
@@ -770,10 +767,8 @@ class YOLODataset(Dataset):
 
         # Handle split structure
         images_root = self.path / "images"
-        if split:
-            splits_to_search = [split]
-        else:
-            splits_to_search = self.splits[:1] if self.splits else []
+        default_splits = self.splits[:1] if self.splits else []
+        splits_to_search = [split] if split else default_splits
 
         for s in splits_to_search:
             split_dir = images_root / s
