@@ -212,10 +212,12 @@ def stats(
             else:
                 image_parts.append(f"{split}: {img_total}")
 
-    console.print(f"\n[green]Dataset: {dataset.format.value.upper()} | "
-                  f"Task: {dataset.task.value} | "
-                  f"Classes: {len(sorted_classes)} | "
-                  f"Total instances: {grand_total}[/green]")
+    console.print(
+        f"\n[green]Dataset: {dataset.format.value.upper()} | "
+        f"Task: {dataset.task.value} | "
+        f"Classes: {len(sorted_classes)} | "
+        f"Total instances: {grand_total}[/green]"
+    )
 
     if image_parts:
         console.print(f"[blue]Images: {' | '.join(image_parts)}[/blue]")
@@ -599,12 +601,16 @@ class _ImageViewer:
             info_text += " [Annotations: OFF]"
 
         cv2.putText(
-            display, info_text, (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
+            display,
+            info_text,
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2,
         )
         cv2.putText(
-            display, info_text, (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
+            display, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
         )
 
         return display
@@ -733,9 +739,11 @@ class _ClassificationGridViewer:
         self.current_index = 0
 
         # Calculate max images across all classes
-        self.max_images = max(
-            len(imgs) for imgs in self.images_by_class.values()
-        ) if self.images_by_class else 0
+        self.max_images = (
+            max(len(imgs) for imgs in self.images_by_class.values())
+            if self.images_by_class
+            else 0
+        )
 
         # Calculate grid layout
         self.cols, self.rows = self._calculate_grid_layout()
@@ -965,9 +973,13 @@ def _draw_annotations(
             )
             # Draw label text
             cv2.putText(
-                img, label,
+                img,
+                label,
                 (x1 + 2, y1 - baseline - 2),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
             )
 
     return img

@@ -111,9 +111,7 @@ def test_split_command_rejects_existing_splits(yolo_detection_dataset: Path) -> 
     assert "already has splits" in result.stdout.lower()
 
 
-def test_split_command_coco_unsplit(
-    tmp_path: Path, coco_unsplit_dataset: Path
-) -> None:
+def test_split_command_coco_unsplit(tmp_path: Path, coco_unsplit_dataset: Path) -> None:
     output_path = tmp_path / "coco_cli_output"
     result = runner.invoke(
         app,

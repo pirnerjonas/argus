@@ -172,9 +172,7 @@ class TestClassificationImagePaths:
 class TestClassificationCLI:
     """Tests for CLI integration with classification datasets."""
 
-    def test_list_shows_classification(
-        self, yolo_classification_dataset: Path
-    ) -> None:
+    def test_list_shows_classification(self, yolo_classification_dataset: Path) -> None:
         """Test that list command shows classification datasets."""
         from typer.testing import CliRunner
 
@@ -196,9 +194,7 @@ class TestClassificationCLI:
         from argus.cli import app
 
         runner = CliRunner()
-        result = runner.invoke(
-            app, ["stats", "-d", str(yolo_classification_dataset)]
-        )
+        result = runner.invoke(app, ["stats", "-d", str(yolo_classification_dataset)])
 
         assert result.exit_code == 0
         assert "cat" in result.output

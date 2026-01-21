@@ -692,12 +692,14 @@ class YOLODataset(Dataset):
                             x = x_center - width / 2
                             y = y_center - height / 2
 
-                            annotations.append({
-                                "class_name": class_name,
-                                "class_id": class_id,
-                                "bbox": (x, y, width, height),
-                                "polygon": None,
-                            })
+                            annotations.append(
+                                {
+                                    "class_name": class_name,
+                                    "class_id": class_id,
+                                    "bbox": (x, y, width, height),
+                                    "polygon": None,
+                                }
+                            )
                         else:
                             # Segmentation: class x1 y1 x2 y2 ... xn yn
                             coords = [float(p) for p in parts[1:]]
@@ -715,12 +717,14 @@ class YOLODataset(Dataset):
                             width = max(xs) - x
                             height = max(ys) - y
 
-                            annotations.append({
-                                "class_name": class_name,
-                                "class_id": class_id,
-                                "bbox": (x, y, width, height),
-                                "polygon": polygon,
-                            })
+                            annotations.append(
+                                {
+                                    "class_name": class_name,
+                                    "class_id": class_id,
+                                    "bbox": (x, y, width, height),
+                                    "polygon": polygon,
+                                }
+                            )
 
                     except (ValueError, IndexError):
                         continue

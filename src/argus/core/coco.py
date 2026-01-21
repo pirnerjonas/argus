@@ -453,12 +453,14 @@ class COCODataset(Dataset):
                         for i in range(0, len(coords), 2):
                             polygon.append((float(coords[i]), float(coords[i + 1])))
 
-                    annotations.append({
-                        "class_name": class_name,
-                        "class_id": cat_id,
-                        "bbox": bbox_tuple,
-                        "polygon": polygon,
-                    })
+                    annotations.append(
+                        {
+                            "class_name": class_name,
+                            "class_id": cat_id,
+                            "bbox": bbox_tuple,
+                            "polygon": polygon,
+                        }
+                    )
 
             except (json.JSONDecodeError, OSError):
                 continue
