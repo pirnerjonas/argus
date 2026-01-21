@@ -378,9 +378,7 @@ names:
     annotations_dir = coco_path / "annotations"
     annotations_dir.mkdir()
     coco_data = {
-        "images": [
-            {"id": 1, "file_name": "img.jpg", "width": 100, "height": 100}
-        ],
+        "images": [{"id": 1, "file_name": "img.jpg", "width": 100, "height": 100}],
         "annotations": [
             {"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 50, 50]}
         ],
