@@ -553,7 +553,7 @@ def validate(
 ) -> None:
     """Validate a classification dataset for outlier samples.
 
-    Uses CLIP embeddings to detect samples that deviate significantly from
+    Uses DINOv2 embeddings to detect samples that deviate significantly from
     their class centroid, which may indicate mislabeled or anomalous images.
 
     Requires AI dependencies: pip install argus-cv[ai]
@@ -615,7 +615,7 @@ def validate(
             console=console,
             transient=True,
         ) as progress:
-            progress.add_task("Loading CLIP model...", total=None)
+            progress.add_task("Loading DINOv2 model...", total=None)
             try:
                 validator = DatasetValidator(batch_size=batch_size)
             except AIFeaturesNotAvailable as e:
