@@ -1,6 +1,8 @@
 """Argus CLI - Vision AI dataset toolkit."""
 
 import hashlib
+import json
+from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
@@ -499,6 +501,226 @@ def split_dataset(
         "[green]Split complete.[/green] "
         f"Train: {counts['train']}, Val: {counts['val']}, Test: {counts['test']}."
     )
+
+
+class OutputFormat(str, Enum):
+    """Output format for validate command."""
+
+    TEXT = "text"
+    JSON = "json"
+
+
+@app.command(name="validate")
+def validate(
+    dataset_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the dataset root directory.",
+        ),
+    ],
+    threshold: Annotated[
+        float,
+        typer.Option(
+            "--threshold",
+            "-t",
+            help="Number of standard deviations for outlier detection.",
+        ),
+    ] = 2.0,
+    split: Annotated[
+        str | None,
+        typer.Option(
+            "--split",
+            "-s",
+            help="Validate specific split only (train/val/test).",
+        ),
+    ] = None,
+    output_format: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format (text, json).",
+        ),
+    ] = OutputFormat.TEXT,
+    batch_size: Annotated[
+        int,
+        typer.Option(
+            "--batch-size",
+            "-b",
+            help="Batch size for embedding computation.",
+        ),
+    ] = 32,
+) -> None:
+    """Validate a classification dataset for outlier samples.
+
+    Uses CLIP embeddings to detect samples that deviate significantly from
+    their class centroid, which may indicate mislabeled or anomalous images.
+
+    Requires AI dependencies: pip install argus-cv[ai]
+    """
+    # Check AI dependencies first
+    try:
+        from argus.core.validate import (
+            AIFeaturesNotAvailable,
+            DatasetValidator,
+        )
+    except ImportError as e:
+        console.print(
+            "[red]Error: AI features require additional dependencies.[/red]\n"
+            "[yellow]Install with: pip install argus-cv[ai][/yellow]"
+        )
+        raise typer.Exit(1) from e
+
+    # Resolve path and validate
+    dataset_path = dataset_path.resolve()
+    if not dataset_path.exists():
+        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
+        raise typer.Exit(1)
+    if not dataset_path.is_dir():
+        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
+        raise typer.Exit(1)
+
+    # Detect dataset
+    dataset = _detect_dataset(dataset_path)
+    if not dataset:
+        console.print(
+            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            "[yellow]Ensure the path points to a dataset root containing "
+            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Check if classification dataset
+    if dataset.task != TaskType.CLASSIFICATION:
+        console.print(
+            f"[red]Error: Validation only supports classification datasets.[/red]\n"
+            f"[yellow]Detected task type: {dataset.task.value}[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Validate split if specified
+    if split and split not in dataset.splits:
+        available = ", ".join(dataset.splits) if dataset.splits else "none"
+        console.print(
+            f"[red]Error: Split '{split}' not found in dataset.[/red]\n"
+            f"[yellow]Available splits: {available}[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    # Initialize validator and run validation
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task("Loading CLIP model...", total=None)
+            try:
+                validator = DatasetValidator(batch_size=batch_size)
+            except AIFeaturesNotAvailable as e:
+                console.print(
+                    "[red]Error: AI features require additional dependencies.[/red]\n"
+                    "[yellow]Install with: pip install argus-cv[ai][/yellow]"
+                )
+                raise typer.Exit(1) from e
+
+            progress.add_task(
+                "Computing embeddings and detecting outliers...", total=None
+            )
+            result = validator.validate(dataset, threshold=threshold, split=split)
+
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1) from e
+
+    # Output results
+    if output_format == OutputFormat.JSON:
+        _output_validation_json(result)
+    else:
+        _output_validation_text(result)
+
+
+def _output_validation_text(result) -> None:  # noqa: ANN001
+    """Output validation results in text format.
+
+    Args:
+        result: ValidationResult from argus.core.validate
+    """
+    split_info = f" (split: {result.split})" if result.split else ""
+    console.print(f"Validating dataset: [cyan]{result.dataset_path}[/cyan]{split_info}")
+    console.print(f"Task type: [magenta]{result.task_type.value}[/magenta]")
+    console.print(f"Classes: [yellow]{result.num_classes}[/yellow]")
+    console.print(f"Total images: [green]{result.total_images:,}[/green]")
+    console.print()
+
+    if result.total_outliers == 0:
+        console.print(
+            f"[green]No outliers found (threshold: {result.threshold} std)[/green]"
+        )
+        return
+
+    console.print(f"[bold]Outliers found (threshold: {result.threshold} std):[/bold]")
+    console.print()
+
+    for class_result in result.class_results:
+        if not class_result.outliers:
+            continue
+
+        outlier_count = len(class_result.outliers)
+        outlier_word = "outlier" if outlier_count == 1 else "outliers"
+        console.print(
+            f"[cyan]Class '{class_result.class_name}'[/cyan] "
+            f"({outlier_count} {outlier_word}):"
+        )
+
+        for outlier in class_result.outliers:
+            dist = f"{outlier.distance:.1f}\u03c3"
+            console.print(f"  - {outlier.path} (distance: {dist})")
+
+        console.print()
+
+    classes_with_outliers = result.classes_with_outliers
+    class_word = "class" if classes_with_outliers == 1 else "classes"
+    console.print(
+        f"[bold]Summary:[/bold] {result.total_outliers} potential "
+        f"{'outlier' if result.total_outliers == 1 else 'outliers'} "
+        f"found in {classes_with_outliers} {class_word}"
+    )
+
+
+def _output_validation_json(result) -> None:  # noqa: ANN001
+    """Output validation results in JSON format.
+
+    Args:
+        result: ValidationResult from argus.core.validate
+    """
+    output = {
+        "dataset_path": str(result.dataset_path),
+        "task_type": result.task_type.value,
+        "num_classes": result.num_classes,
+        "total_images": result.total_images,
+        "threshold": result.threshold,
+        "split": result.split,
+        "total_outliers": result.total_outliers,
+        "classes_with_outliers": result.classes_with_outliers,
+        "class_results": [
+            {
+                "class_name": cr.class_name,
+                "total_samples": cr.total_samples,
+                "outliers": [
+                    {
+                        "path": str(o.path),
+                        "distance": o.distance,
+                    }
+                    for o in cr.outliers
+                ],
+            }
+            for cr in result.class_results
+        ],
+    }
+    # Use print instead of console.print to avoid rich formatting in JSON
+    print(json.dumps(output, indent=2))
 
 
 class _ImageViewer:
