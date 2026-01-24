@@ -458,3 +458,273 @@ def yolo_classification_multiclass_dataset(tmp_path: Path) -> Path:
             )
 
     return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_grayscale(tmp_path: Path) -> Path:
+    """Create a mask dataset with grayscale masks (no config file).
+
+    Structure:
+        dataset/
+        ├── images/
+        │   ├── train/
+        │   │   └── img001.jpg
+        │   └── val/
+        │       └── img002.jpg
+        └── masks/
+            ├── train/
+            │   └── img001.png
+            └── val/
+                └── img002.png
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_grayscale"
+    dataset_path.mkdir()
+
+    # Create directory structure
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "images" / "val").mkdir(parents=True)
+    (dataset_path / "masks" / "train").mkdir(parents=True)
+    (dataset_path / "masks" / "val").mkdir(parents=True)
+
+    # Create dummy images (100x100 RGB)
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img001.jpg"), img)
+    cv2.imwrite(str(dataset_path / "images" / "val" / "img002.jpg"), img)
+
+    # Create grayscale masks (100x100)
+    # Train mask: background (0), class 1, class 2
+    train_mask = np.zeros((100, 100), dtype=np.uint8)
+    train_mask[20:40, 20:40] = 1  # Class 1 region
+    train_mask[60:80, 60:80] = 2  # Class 2 region
+    cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), train_mask)
+
+    # Val mask: background (0), class 1, some ignored (255)
+    val_mask = np.zeros((100, 100), dtype=np.uint8)
+    val_mask[30:50, 30:50] = 1  # Class 1 region
+    val_mask[70:90, 70:90] = 255  # Ignored region
+    cv2.imwrite(str(dataset_path / "masks" / "val" / "img002.png"), val_mask)
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_rgb(tmp_path: Path) -> Path:
+    """Create a mask dataset with RGB palette masks and config file.
+
+    Structure:
+        dataset/
+        ├── classes.yaml
+        ├── images/
+        │   └── train/
+        │       └── img001.jpg
+        └── masks/
+            └── train/
+                └── img001.png
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_rgb"
+    dataset_path.mkdir()
+
+    # Create classes.yaml with RGB palette
+    yaml_content = """
+names:
+  0: background
+  1: person
+  2: car
+
+ignore_index: 255
+
+palette:
+  - color: [0, 0, 0]
+    name: background
+    id: 0
+  - color: [220, 20, 60]
+    name: person
+    id: 1
+  - color: [0, 0, 142]
+    name: car
+    id: 2
+"""
+    (dataset_path / "classes.yaml").write_text(yaml_content)
+
+    # Create directory structure
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "masks" / "train").mkdir(parents=True)
+
+    # Create dummy image
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img001.jpg"), img)
+
+    # Create RGB mask (actually using grayscale encoding for simplicity)
+    # The class config provides the mapping
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    mask[20:40, 20:40] = 1  # Person region
+    mask[60:80, 60:80] = 2  # Car region
+    cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), mask)
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_cityscapes(tmp_path: Path) -> Path:
+    """Create a Cityscapes-style mask dataset.
+
+    Structure:
+        dataset/
+        ├── classes.yaml
+        ├── leftImg8bit/
+        │   └── train/
+        │       └── city001_000000_000000_leftImg8bit.png
+        └── gtFine/
+            └── train/
+                └── city001_000000_000000_leftImg8bit.png
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_cityscapes"
+    dataset_path.mkdir()
+
+    # Create classes.yaml
+    yaml_content = """
+names:
+  0: road
+  1: sidewalk
+  2: building
+
+ignore_index: 255
+"""
+    (dataset_path / "classes.yaml").write_text(yaml_content)
+
+    # Create Cityscapes-style directory structure
+    (dataset_path / "leftImg8bit" / "train").mkdir(parents=True)
+    (dataset_path / "gtFine" / "train").mkdir(parents=True)
+
+    # Create image
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(
+        str(dataset_path / "leftImg8bit" / "train" / "city_000000_leftImg8bit.png"), img
+    )
+
+    # Create mask
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    mask[0:30, :] = 2  # Building (top)
+    mask[30:60, :] = 1  # Sidewalk (middle)
+    mask[60:100, :] = 0  # Road (bottom)
+    cv2.imwrite(
+        str(dataset_path / "gtFine" / "train" / "city_000000_leftImg8bit.png"), mask
+    )
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_unsplit(tmp_path: Path) -> Path:
+    """Create a mask dataset without train/val splits.
+
+    Structure:
+        dataset/
+        ├── images/
+        │   ├── img001.jpg
+        │   └── img002.jpg
+        └── masks/
+            ├── img001.png
+            └── img002.png
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_unsplit"
+    dataset_path.mkdir()
+
+    # Create flat directory structure
+    (dataset_path / "images").mkdir()
+    (dataset_path / "masks").mkdir()
+
+    # Create images and masks
+    for i in range(1, 3):
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(dataset_path / "images" / f"img{i:03d}.jpg"), img)
+
+        mask = np.zeros((100, 100), dtype=np.uint8)
+        mask[20:60, 20:60] = i  # Different class per image
+        cv2.imwrite(str(dataset_path / "masks" / f"img{i:03d}.png"), mask)
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_missing_mask(tmp_path: Path) -> Path:
+    """Create a mask dataset where some images have no corresponding mask.
+
+    Structure:
+        dataset/
+        ├── images/
+        │   └── train/
+        │       ├── img001.jpg (has mask)
+        │       └── img002.jpg (no mask)
+        └── masks/
+            └── train/
+                └── img001.png
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_missing"
+    dataset_path.mkdir()
+
+    # Create directory structure
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "masks" / "train").mkdir(parents=True)
+
+    # Create two images
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img001.jpg"), img)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img002.jpg"), img)
+
+    # Only create mask for first image
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    mask[20:60, 20:60] = 1
+    cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), mask)
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
+    """Create a mask dataset where image and mask have different dimensions.
+
+    Structure:
+        dataset/
+        ├── images/
+        │   └── train/
+        │       └── img001.jpg (100x100)
+        └── masks/
+            └── train/
+                └── img001.png (50x50)
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_mismatch"
+    dataset_path.mkdir()
+
+    # Create directory structure
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "masks" / "train").mkdir(parents=True)
+
+    # Create 100x100 image
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img001.jpg"), img)
+
+    # Create 50x50 mask (mismatch)
+    mask = np.zeros((50, 50), dtype=np.uint8)
+    mask[10:30, 10:30] = 1
+    cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), mask)
+
+    return dataset_path

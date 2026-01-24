@@ -89,6 +89,11 @@ class YOLODataset(Dataset):
                 if "names" not in config:
                     continue
 
+                # Skip if this looks like a mask dataset config
+                # (has ignore_index or palette keys which are mask-specific)
+                if "ignore_index" in config or "palette" in config:
+                    continue
+
                 names = config["names"]
 
                 # Extract class names
