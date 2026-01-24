@@ -11,8 +11,8 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from argus.core import COCODataset, Dataset, YOLODataset
-from argus.core.base import TaskType
+from argus.core import COCODataset, Dataset, MaskDataset, YOLODataset
+from argus.core.base import DatasetFormat, TaskType
 from argus.core.split import (
     is_coco_unsplit,
     parse_ratio,
@@ -128,11 +128,18 @@ def stats(
     dataset = _detect_dataset(dataset_path)
     if not dataset:
         console.print(
-            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
-            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+            "data.yaml (YOLO), annotations/ folder (COCO), or "
+            "images/ + masks/ directories (Mask).[/yellow]"
         )
         raise typer.Exit(1)
+
+    # Handle mask datasets with pixel statistics
+    if dataset.format == DatasetFormat.MASK:
+        assert isinstance(dataset, MaskDataset)
+        _show_mask_stats(dataset, dataset_path)
+        return
 
     # Get instance counts with progress indicator
     with Progress(
@@ -223,6 +230,94 @@ def stats(
         console.print(f"[blue]Images: {' | '.join(image_parts)}[/blue]")
 
 
+def _show_mask_stats(dataset: MaskDataset, dataset_path: Path) -> None:
+    """Show statistics for mask datasets with pixel-level information.
+
+    Args:
+        dataset: The MaskDataset instance.
+        dataset_path: Path to the dataset root.
+    """
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        progress.add_task("Analyzing mask dataset...", total=None)
+        pixel_counts = dataset.get_pixel_counts()
+        image_presence = dataset.get_image_class_presence()
+        image_counts = dataset.get_image_counts()
+
+    # Get class mapping
+    class_mapping = dataset.get_class_mapping()
+
+    # Calculate total non-ignored pixels
+    total_pixels = sum(
+        count
+        for class_id, count in pixel_counts.items()
+        if class_id != dataset.ignore_index
+    )
+    ignored_pixels = pixel_counts.get(dataset.ignore_index, 0)
+
+    # Calculate total images
+    total_images = sum(ic["total"] for ic in image_counts.values())
+
+    # Create table
+    splits_str = ", ".join(dataset.splits) if dataset.splits else "unsplit"
+    title = f"Class Statistics: {dataset_path.name} ({splits_str})"
+    table = Table(title=title)
+    table.add_column("Class", style="cyan")
+    table.add_column("Total Pixels", justify="right", style="green")
+    table.add_column("% Coverage", justify="right", style="magenta")
+    table.add_column("Images With", justify="right", style="yellow")
+
+    # Sort classes by class_id
+    sorted_class_ids = sorted(class_mapping.keys())
+
+    for class_id in sorted_class_ids:
+        class_name = class_mapping[class_id]
+        pixels = pixel_counts.get(class_id, 0)
+        presence = image_presence.get(class_id, 0)
+
+        # Calculate coverage percentage
+        coverage = (pixels / total_pixels * 100) if total_pixels > 0 else 0.0
+
+        table.add_row(
+            class_name,
+            f"{pixels:,}",
+            f"{coverage:.1f}%",
+            str(presence),
+        )
+
+    # Add ignored row if there are ignored pixels
+    if ignored_pixels > 0:
+        table.add_section()
+        table.add_row(
+            "[dim](ignored)[/dim]",
+            f"[dim]{ignored_pixels:,}[/dim]",
+            "[dim]-[/dim]",
+            f"[dim]{total_images}[/dim]",
+        )
+
+    console.print(table)
+
+    # Summary line
+    console.print(f"\n[green]Dataset: {dataset_path}[/green]")
+    console.print(
+        f"[green]Format: {dataset.format.value.upper()} | "
+        f"Task: {dataset.task.value}[/green]"
+    )
+
+    # Image counts per split
+    image_parts = []
+    for split in dataset.splits if dataset.splits else ["unsplit"]:
+        if split in image_counts:
+            image_parts.append(f"{split}: {image_counts[split]['total']}")
+
+    if image_parts:
+        console.print(f"[blue]Images: {' | '.join(image_parts)}[/blue]")
+
+
 @app.command(name="view")
 def view(
     dataset_path: Annotated[
@@ -249,6 +344,16 @@ def view(
             help="Maximum classes to show in grid (classification only).",
         ),
     ] = None,
+    opacity: Annotated[
+        float,
+        typer.Option(
+            "--opacity",
+            "-o",
+            help="Mask overlay opacity (0.0-1.0, mask datasets only).",
+            min=0.0,
+            max=1.0,
+        ),
+    ] = 0.5,
 ) -> None:
     """View annotated images in a dataset.
 
@@ -296,6 +401,41 @@ def view(
 
     # Generate consistent colors for each class
     class_colors = _generate_class_colors(dataset.class_names)
+
+    # Handle mask datasets with overlay viewer
+    if dataset.format == DatasetFormat.MASK:
+        assert isinstance(dataset, MaskDataset)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task("Loading images...", total=None)
+            image_paths = dataset.get_image_paths(split)
+
+        if not image_paths:
+            console.print("[yellow]No images found in the dataset.[/yellow]")
+            return
+
+        console.print(
+            f"[green]Found {len(image_paths)} images. "
+            f"Opening mask viewer...[/green]\n"
+            "[dim]Controls: \u2190 / \u2192 or P / N to navigate, "
+            "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle overlay, "
+            "Q / ESC to quit[/dim]"
+        )
+
+        viewer = _MaskViewer(
+            image_paths=image_paths,
+            dataset=dataset,
+            class_colors=class_colors,
+            window_name=f"Argus Mask Viewer - {dataset_path.name}",
+            opacity=opacity,
+        )
+        viewer.run()
+        console.print("[green]Viewer closed.[/green]")
+        return
 
     # Handle classification datasets with grid viewer
     if dataset.task == TaskType.CLASSIFICATION:
@@ -891,6 +1031,267 @@ class _ClassificationGridViewer:
         cv2.destroyAllWindows()
 
 
+class _MaskViewer:
+    """Interactive viewer for semantic mask datasets with colored overlay."""
+
+    def __init__(
+        self,
+        image_paths: list[Path],
+        dataset: MaskDataset,
+        class_colors: dict[str, tuple[int, int, int]],
+        window_name: str,
+        opacity: float = 0.5,
+    ):
+        self.image_paths = image_paths
+        self.dataset = dataset
+        self.class_colors = class_colors
+        self.window_name = window_name
+        self.opacity = opacity
+
+        self.current_idx = 0
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+
+        # Mouse state for panning
+        self.dragging = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        self.pan_start_x = 0.0
+        self.pan_start_y = 0.0
+
+        # Current image cache
+        self.current_img: np.ndarray | None = None
+        self.overlay_img: np.ndarray | None = None
+
+        # Overlay visibility toggle
+        self.show_overlay = True
+
+        # Build class_id to color mapping
+        self._id_to_color: dict[int, tuple[int, int, int]] = {}
+        class_mapping = dataset.get_class_mapping()
+        for class_id, class_name in class_mapping.items():
+            if class_name in class_colors:
+                self._id_to_color[class_id] = class_colors[class_name]
+
+    def _load_current_image(self) -> bool:
+        """Load current image and create mask overlay."""
+        image_path = self.image_paths[self.current_idx]
+
+        img = cv2.imread(str(image_path))
+        if img is None:
+            return False
+
+        mask = self.dataset.load_mask(image_path)
+        if mask is None:
+            console.print(f"[yellow]Warning: No mask for {image_path}[/yellow]")
+            self.current_img = img
+            self.overlay_img = img.copy()
+            return True
+
+        # Validate dimensions
+        if img.shape[:2] != mask.shape[:2]:
+            console.print(
+                f"[red]Error: Dimension mismatch for {image_path.name}: "
+                f"image={img.shape[:2]}, mask={mask.shape[:2]}[/red]"
+            )
+            return False
+
+        self.current_img = img
+        self.overlay_img = self._create_overlay(img, mask)
+        return True
+
+    def _create_overlay(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """Create colored overlay from mask.
+
+        Args:
+            img: Original image (BGR).
+            mask: Grayscale mask with class IDs.
+
+        Returns:
+            Image with colored mask overlay.
+        """
+        # Create colored mask
+        h, w = mask.shape
+        colored_mask = np.zeros((h, w, 3), dtype=np.uint8)
+
+        for class_id, color in self._id_to_color.items():
+            colored_mask[mask == class_id] = color
+
+        # Blend with original image
+        # Ignore pixels are fully transparent (not blended)
+        ignore_mask = mask == self.dataset.ignore_index
+        alpha = np.ones((h, w, 1), dtype=np.float32) * self.opacity
+        alpha[ignore_mask] = 0.0
+
+        # Blend: result = img * (1 - alpha) + colored_mask * alpha
+        blended = (
+            img.astype(np.float32) * (1 - alpha)
+            + colored_mask.astype(np.float32) * alpha
+        )
+        return blended.astype(np.uint8)
+
+    def _get_display_image(self) -> np.ndarray:
+        """Get the image transformed for current zoom/pan."""
+        if self.overlay_img is None:
+            return np.zeros((480, 640, 3), dtype=np.uint8)
+
+        if self.show_overlay:
+            img = self.overlay_img
+        elif self.current_img is not None:
+            img = self.current_img
+        else:
+            img = self.overlay_img
+
+        h, w = img.shape[:2]
+
+        if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
+            display = img.copy()
+        else:
+            # Calculate the visible region
+            view_w = int(w / self.zoom)
+            view_h = int(h / self.zoom)
+
+            # Center point with pan offset
+            cx = w / 2 + self.pan_x
+            cy = h / 2 + self.pan_y
+
+            # Calculate crop bounds
+            x1 = int(max(0, cx - view_w / 2))
+            y1 = int(max(0, cy - view_h / 2))
+            x2 = int(min(w, x1 + view_w))
+            y2 = int(min(h, y1 + view_h))
+
+            # Adjust if we hit boundaries
+            if x2 - x1 < view_w:
+                x1 = max(0, x2 - view_w)
+            if y2 - y1 < view_h:
+                y1 = max(0, y2 - view_h)
+
+            # Crop and resize
+            cropped = img[y1:y2, x1:x2]
+            display = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+
+        # Add info overlay
+        image_path = self.image_paths[self.current_idx]
+        idx = self.current_idx + 1
+        total = len(self.image_paths)
+        info_text = f"[{idx}/{total}] {image_path.name}"
+        if self.zoom > 1.0:
+            info_text += f" (Zoom: {self.zoom:.1f}x)"
+        if not self.show_overlay:
+            info_text += " [Overlay: OFF]"
+
+        cv2.putText(
+            display,
+            info_text,
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2,
+        )
+        cv2.putText(
+            display, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
+        )
+
+        return display
+
+    def _mouse_callback(
+        self, event: int, x: int, y: int, flags: int, param: None
+    ) -> None:
+        """Handle mouse events for zoom and pan."""
+        if event == cv2.EVENT_MOUSEWHEEL:
+            # Zoom in/out
+            if flags > 0:
+                self.zoom = min(10.0, self.zoom * 1.2)
+            else:
+                self.zoom = max(1.0, self.zoom / 1.2)
+
+            # Reset pan if zoomed out to 1x
+            if self.zoom == 1.0:
+                self.pan_x = 0.0
+                self.pan_y = 0.0
+
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            self.dragging = True
+            self.drag_start_x = x
+            self.drag_start_y = y
+            self.pan_start_x = self.pan_x
+            self.pan_start_y = self.pan_y
+
+        elif event == cv2.EVENT_MOUSEMOVE and self.dragging:
+            if self.zoom > 1.0 and self.overlay_img is not None:
+                h, w = self.overlay_img.shape[:2]
+                # Calculate pan delta (inverted for natural feel)
+                dx = (self.drag_start_x - x) / self.zoom
+                dy = (self.drag_start_y - y) / self.zoom
+
+                # Update pan with limits
+                max_pan_x = w * (1 - 1 / self.zoom) / 2
+                max_pan_y = h * (1 - 1 / self.zoom) / 2
+
+                self.pan_x = max(-max_pan_x, min(max_pan_x, self.pan_start_x + dx))
+                self.pan_y = max(-max_pan_y, min(max_pan_y, self.pan_start_y + dy))
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.dragging = False
+
+    def _reset_view(self) -> None:
+        """Reset zoom and pan to default."""
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+
+    def _next_image(self) -> None:
+        """Go to next image."""
+        self.current_idx = (self.current_idx + 1) % len(self.image_paths)
+        self._reset_view()
+
+    def _prev_image(self) -> None:
+        """Go to previous image."""
+        self.current_idx = (self.current_idx - 1) % len(self.image_paths)
+        self._reset_view()
+
+    def run(self) -> None:
+        """Run the interactive viewer."""
+        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
+        cv2.setMouseCallback(self.window_name, self._mouse_callback)
+
+        while True:
+            # Load image if needed
+            if self.overlay_img is None and not self._load_current_image():
+                console.print(
+                    f"[yellow]Warning: Could not load "
+                    f"{self.image_paths[self.current_idx]}[/yellow]"
+                )
+                self._next_image()
+                continue
+
+            # Display image
+            display = self._get_display_image()
+            cv2.imshow(self.window_name, display)
+
+            # Wait for input (short timeout for smooth panning)
+            key = cv2.waitKey(30) & 0xFF
+
+            # Handle keyboard input
+            if key == ord("q") or key == 27:  # Q or ESC
+                break
+            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
+                self.overlay_img = None
+                self._next_image()
+            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
+                self.overlay_img = None
+                self._prev_image()
+            elif key == ord("r"):  # R to reset zoom
+                self._reset_view()
+            elif key == ord("t"):  # T to toggle overlay
+                self.show_overlay = not self.show_overlay
+
+        cv2.destroyAllWindows()
+
+
 def _generate_class_colors(class_names: list[str]) -> dict[str, tuple[int, int, int]]:
     """Generate consistent colors for each class name.
 
@@ -1038,14 +1439,22 @@ def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:
 
 
 def _detect_dataset(path: Path) -> Dataset | None:
-    """Try to detect a dataset at the given path."""
-    # Try YOLO first (more specific patterns)
+    """Try to detect a dataset at the given path.
+
+    Detection priority: YOLO -> COCO -> MaskDataset
+    """
+    # Try YOLO first (more specific patterns - requires data.yaml)
     dataset = YOLODataset.detect(path)
     if dataset:
         return dataset
 
-    # Try COCO
+    # Try COCO (requires annotations/*.json)
     dataset = COCODataset.detect(path)
+    if dataset:
+        return dataset
+
+    # Try MaskDataset (directory structure based)
+    dataset = MaskDataset.detect(path)
     if dataset:
         return dataset
 

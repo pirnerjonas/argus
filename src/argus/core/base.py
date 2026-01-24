@@ -11,6 +11,7 @@ class DatasetFormat(str, Enum):
 
     YOLO = "yolo"
     COCO = "coco"
+    MASK = "mask"
 
 
 class TaskType(str, Enum):

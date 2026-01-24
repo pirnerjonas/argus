@@ -265,7 +265,7 @@ class TestStatsCommand:
         result = runner.invoke(app, ["stats", "--dataset-path", str(empty_directory)])
 
         assert result.exit_code == 1
-        assert "No YOLO or COCO dataset found" in result.stdout
+        assert "No dataset found" in result.stdout
 
     def test_stats_short_option(self, yolo_detection_dataset: Path) -> None:
         """Test stats command with short -d option."""
