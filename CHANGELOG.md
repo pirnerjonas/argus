@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-01-24)
+
+### Features
+
+- Add MaskDataset class for semantic segmentation masks
+  ([`bbba4f2`](https://github.com/pirnerjonas/argus/commit/bbba4f2c9d476d426b6c805ad2120eca9c38c855))
+
+
 ## v1.2.0 (2026-01-15)
 
 ### Code Style
