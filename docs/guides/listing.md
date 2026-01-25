@@ -11,7 +11,7 @@ argus-cv list --path /datasets
 This prints a table showing:
 
 - Dataset path
-- Format (yolo or coco)
+- Format (yolo, coco, or mask)
 - Task (detection or segmentation)
 - Number of classes
 - Detected splits

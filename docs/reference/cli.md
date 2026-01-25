@@ -3,7 +3,7 @@
 ## Global
 
 ```bash
-argus --help
+argus-cv --help
 ```
 
 Argus uses subcommands: `list`, `stats`, `view`, and `split`.
@@ -45,6 +45,7 @@ Options:
 
 - `--dataset-path`, `-d`: dataset root path
 - `--split`, `-s`: split to view (train, val, test)
+- `--opacity`, `-o`: mask overlay opacity (mask datasets only)
 
 ## split
 

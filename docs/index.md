@@ -3,8 +3,9 @@
     <p class="hero__eyebrow">Argus</p>
     <h1>Vision AI dataset work, without the friction.</h1>
     <p>
-      Argus is a focused CLI for YOLO and COCO datasets. List datasets, inspect
-      class balance, view annotations, and split cleanly for training.
+      Argus is a focused CLI for YOLO, COCO, and semantic mask datasets. List
+      datasets, inspect class balance, view annotations, and split cleanly for
+      training.
     </p>
     <div class="hero__actions">
       <a class="md-button md-button--primary" href="getting-started/quickstart/">Get started</a>
@@ -30,7 +31,7 @@ argus-cv view -d /data/animals --split val
 <div class="grid cards">
   <div class="card">
     <h3>Format-aware</h3>
-    <p>Detects YOLO and COCO by structure and metadata, not guesses.</p>
+    <p>Detects YOLO, COCO, and mask datasets by structure and metadata.</p>
   </div>
   <div class="card">
     <h3>Readable statistics</h3>
@@ -38,7 +39,7 @@ argus-cv view -d /data/animals --split val
   </div>
   <div class="card">
     <h3>Annotation viewer</h3>
-    <p>Browse images with boxes and masks overlayed. Pan and zoom included.</p>
+    <p>Browse images with boxes, polygons, and mask overlays. Pan and zoom included.</p>
   </div>
   <div class="card">
     <h3>Clean splits</h3>

@@ -1,5 +1,5 @@
 site_name: Argus
-site_description: Vision AI dataset toolkit for YOLO and COCO datasets.
+site_description: Vision AI dataset toolkit for YOLO, COCO, and mask datasets.
 site_author: Argus
 site_url: https://pirnerjonas.github.io/argus/
 repo_name: pirnerjonas/argus
