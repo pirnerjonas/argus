@@ -8,7 +8,7 @@ Use `argus-cv split` to create train/val/test splits from an unsplit dataset.
 argus-cv split -d /datasets/animals -o /datasets/animals_splits
 ```
 
-By default, Argus uses a 0.8/0.1/0.1 ratio and stratified sampling.
+Argus uses a 0.8/0.1/0.1 ratio and stratified sampling by default.
 
 ## Custom ratio
 
@@ -17,12 +17,6 @@ argus-cv split -d /datasets/animals -o /datasets/animals_splits -r 0.7,0.2,0.1
 ```
 
 Ratios can sum to 1.0 or 100.
-
-## Disable stratification
-
-```bash
-argus-cv split -d /datasets/animals -o /datasets/animals_splits --no-stratify
-```
 
 ## Set a seed for determinism
 
