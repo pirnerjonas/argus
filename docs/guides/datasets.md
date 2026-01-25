@@ -1,7 +1,7 @@
 # Dataset formats
 
-Argus supports YOLO and COCO datasets. Detection and segmentation are handled
-out of the box.
+Argus supports YOLO, COCO, and folder-based semantic mask datasets. Detection
+and segmentation are handled out of the box.
 
 ## YOLO
 
@@ -58,6 +58,60 @@ dataset/
 
 If your annotation filenames include `train`, `val`, or `test`, Argus will treat
 those as splits. Otherwise it defaults to `train`.
+
+## Mask (semantic segmentation)
+
+Mask datasets are simple image + mask folders. Argus detects a few common
+patterns:
+
+- `images/` + `masks/`
+- `img/` + `gt/`
+- `leftImg8bit/` + `gtFine/` (Cityscapes-style)
+
+Split-aware layout:
+
+```text
+dataset/
+├── images/
+│   ├── train/
+│   └── val/
+├── masks/
+│   ├── train/
+│   └── val/
+└── classes.yaml  # Optional for grayscale, required for RGB palette masks
+```
+
+Unsplit layout:
+
+```text
+dataset/
+├── images/
+├── masks/
+└── classes.yaml
+```
+
+### Mask encoding
+
+- Grayscale masks: each pixel value is the class ID. Argus will auto-detect
+  class IDs if no `classes.yaml` is provided.
+- RGB palette masks: each class maps to a color. A `classes.yaml` is required.
+- Mask files should be `.png` and match the image stem (e.g., `frame.png`), or
+  use common suffixes like `_mask`, `_gt`, or `_label`.
+
+Example `classes.yaml`:
+
+```yaml
+names:
+  - background
+  - road
+  - sidewalk
+ignore_index: 255
+palette:
+  - id: 0
+    name: background
+  - id: 1
+    name: road
+```
 
 ## Detection heuristics
 

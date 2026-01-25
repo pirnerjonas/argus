@@ -1,6 +1,6 @@
 # argus-cv
 
-Vision AI dataset toolkit for working with YOLO and COCO datasets.
+Vision AI dataset toolkit for working with YOLO, COCO, and semantic mask datasets.
 
 **[Documentation](https://pirnerjonas.github.io/argus/)**
 
@@ -9,6 +9,13 @@ Vision AI dataset toolkit for working with YOLO and COCO datasets.
 ```bash
 uvx argus-cv
 ```
+
+## Highlights
+
+- Detects YOLO, COCO, and folder-based semantic mask datasets.
+- Reports per-class stats (pixel coverage for mask datasets).
+- Interactive viewer with bounding boxes, polygons, or mask overlays.
+- Split unsplit YOLO/COCO datasets into train/val/test.
 
 ## Usage
 

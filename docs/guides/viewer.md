@@ -1,6 +1,7 @@
 # Visual inspection
 
-The viewer overlays boxes and masks for quick spot checks.
+The viewer overlays boxes and masks for quick spot checks. For mask datasets,
+it blends the segmentation mask over the image.
 
 ## Launching the viewer
 
@@ -14,6 +15,12 @@ argus-cv view -d /datasets/retail
 argus-cv view -d /datasets/retail --split val
 ```
 
+### Adjust mask opacity
+
+```bash
+argus-cv view -d /datasets/roads --opacity 0.3
+```
+
 ## Controls
 
 - Right arrow or `N`: next image
@@ -22,6 +29,7 @@ argus-cv view -d /datasets/retail --split val
 - Drag: pan while zoomed
 - `R`: reset zoom
 - `Q` or `Esc`: quit
+- `T`: toggle annotations or mask overlay
 
 ## Notes
 

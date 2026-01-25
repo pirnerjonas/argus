@@ -6,7 +6,7 @@ workflow.
 ## Quick install with uv
 
 ```bash
-uvx argus
+uvx argus-cv
 ```
 
 `uvx` runs the package in an isolated environment and keeps it up to date.
@@ -14,19 +14,19 @@ uvx argus
 Verify it works:
 
 ```bash
-argus --help
+argus-cv --help
 ```
 
 ## pipx
 
 ```bash
-pipx install argus
+pipx install argus-cv
 ```
 
 Verify it works:
 
 ```bash
-argus --help
+argus-cv --help
 ```
 
 ## From source
@@ -40,7 +40,7 @@ pip install -e .
 Verify it works:
 
 ```bash
-argus --help
+argus-cv --help
 ```
 
 ## Requirements

@@ -1,6 +1,8 @@
 # Stats and counts
 
 `argus-cv stats` provides per-class instance counts and image totals by split.
+For mask datasets, it reports pixel coverage and how many images contain each
+class.
 
 ## Example
 
@@ -25,3 +27,4 @@ If Argus prints "No annotations found", check:
 
 - YOLO: `labels/` exists and matches `images/`.
 - COCO: annotation JSON files are valid and contain `annotations`.
+- Mask: masks are `.png` files and match the image file names.
