@@ -55,7 +55,6 @@ Create train/val/test splits from an unsplit dataset.
 argus-cv split --dataset-path /datasets/animals \
   --output-path /datasets/animals_splits \
   --ratio 0.8,0.1,0.1 \
-  --stratify \
   --seed 42
 ```
 
@@ -64,5 +63,4 @@ Options:
 - `--dataset-path`, `-d`: dataset root path
 - `--output-path`, `-o`: output directory (default: "splits" inside dataset path)
 - `--ratio`, `-r`: train/val/test ratio (default: 0.8,0.1,0.1)
-- `--stratify/--no-stratify`: enable or disable stratified splitting (default: enabled)
 - `--seed`: random seed (default: 42)

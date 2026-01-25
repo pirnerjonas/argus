@@ -534,13 +534,6 @@ def split_dataset(
             help="Train/val/test ratio (e.g. 0.8,0.1,0.1).",
         ),
     ] = "0.8,0.1,0.1",
-    stratify: Annotated[
-        bool,
-        typer.Option(
-            "--stratify/--no-stratify",
-            help="Stratify by class distribution when splitting.",
-        ),
-    ] = True,
     seed: Annotated[
         int,
         typer.Option(
@@ -593,9 +586,7 @@ def split_dataset(
         ) as progress:
             progress.add_task("Creating YOLO splits...", total=None)
             try:
-                counts = split_yolo_dataset(
-                    dataset, output_path, ratios, stratify, seed
-                )
+                counts = split_yolo_dataset(dataset, output_path, ratios, True, seed)
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc
@@ -628,7 +619,7 @@ def split_dataset(
                     annotation_file,
                     output_path,
                     ratios,
-                    stratify,
+                    True,
                     seed,
                 )
             except ValueError as exc:
