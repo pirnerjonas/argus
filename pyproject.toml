@@ -25,6 +25,12 @@ docs = [
     "mkdocs-material>=9.5.0",
 ]
 
+[project.optional-dependencies]
+ai = [
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
+]
+
 [project.scripts]
 argus-cv = "argus.cli:app"
 
