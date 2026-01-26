@@ -1343,9 +1343,12 @@ def _draw_annotations(
             overlay = img.copy()
             cv2.fillPoly(overlay, [pts], color)
             cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+            # Draw small points at polygon vertices
+            for pt in pts:
+                cv2.circle(img, tuple(pt), radius=3, color=color, thickness=-1)
 
-        # Draw bounding box
-        if bbox:
+        # Draw bounding box (only for detection, not segmentation)
+        if bbox and not polygon:
             x, y, w, h = bbox
             x1, y1 = int(x), int(y)
             x2, y2 = int(x + w), int(y + h)
