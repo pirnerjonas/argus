@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-01-26)
+
+### Features
+
+- **view**: Show polygon vertices and hide bbox for segmentation
+  ([`03b34f7`](https://github.com/pirnerjonas/argus/commit/03b34f78fdafefd35a8b2594bf1296007716d6c9))
+
+
 ## v1.3.0 (2026-01-24)
 
 ### Features
