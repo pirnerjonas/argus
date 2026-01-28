@@ -75,6 +75,13 @@ class COCODataset(Dataset):
         # Also check root directory for single annotation file
         annotation_files.extend(path.glob("*.json"))
 
+        # Check split directories for Roboflow COCO format
+        for split_name in ["train", "valid", "val", "test"]:
+            split_dir = path / split_name
+            if split_dir.is_dir():
+                annotation_files.extend(split_dir.glob("*annotations*.json"))
+                annotation_files.extend(split_dir.glob("*coco*.json"))
+
         # Filter to only include files that might be COCO annotations
         # (exclude package.json, tsconfig.json, etc.)
         filtered_files = []
@@ -185,8 +192,10 @@ class COCODataset(Dataset):
                     if isinstance(cat, dict) and "id" in cat and "name" in cat:
                         id_to_name[cat["id"]] = cat["name"]
 
-                # Determine split from filename
-                split = self._get_split_from_filename(ann_file.stem)
+                # Determine split from filename or parent directory
+                split = self._get_split_from_filename(
+                    ann_file.stem, ann_file.parent.name
+                )
 
                 # Count annotations per category
                 split_counts: dict[str, int] = counts.get(split, {})
@@ -224,7 +233,9 @@ class COCODataset(Dataset):
                 if not isinstance(data, dict):
                     continue
 
-                split = self._get_split_from_filename(ann_file.stem)
+                split = self._get_split_from_filename(
+                    ann_file.stem, ann_file.parent.name
+                )
 
                 images = data.get("images", [])
                 annotations = data.get("annotations", [])
@@ -256,11 +267,12 @@ class COCODataset(Dataset):
         return counts
 
     @staticmethod
-    def _get_split_from_filename(filename: str) -> str:
-        """Extract split name from annotation filename.
+    def _get_split_from_filename(filename: str, parent_dir: str | None = None) -> str:
+        """Extract split name from annotation filename or parent directory.
 
         Args:
             filename: Annotation file stem (without extension).
+            parent_dir: Optional parent directory name (for Roboflow COCO format).
 
         Returns:
             Split name (train, val, test) or 'train' as default.
@@ -272,6 +284,17 @@ class COCODataset(Dataset):
             return "val"
         elif "test" in name_lower:
             return "test"
+
+        # Check parent directory name (Roboflow COCO format)
+        if parent_dir:
+            parent_lower = parent_dir.lower()
+            if parent_lower == "train":
+                return "train"
+            elif parent_lower in ("val", "valid"):
+                return "val"
+            elif parent_lower == "test":
+                return "test"
+
         return "train"
 
     @classmethod
@@ -301,7 +324,7 @@ class COCODataset(Dataset):
 
     @classmethod
     def _detect_splits(cls, annotation_files: list[Path]) -> list[str]:
-        """Detect available splits from annotation filenames.
+        """Detect available splits from annotation filenames or parent directories.
 
         Args:
             annotation_files: List of annotation file paths.
@@ -313,12 +336,21 @@ class COCODataset(Dataset):
 
         for ann_file in annotation_files:
             name_lower = ann_file.stem.lower()
+            parent_lower = ann_file.parent.name.lower()
 
+            # Check filename first
             if "train" in name_lower and "train" not in splits:
                 splits.append("train")
             elif "val" in name_lower and "val" not in splits:
                 splits.append("val")
             elif "test" in name_lower and "test" not in splits:
+                splits.append("test")
+            # Check parent directory (Roboflow COCO format)
+            elif parent_lower == "train" and "train" not in splits:
+                splits.append("train")
+            elif parent_lower in ("val", "valid") and "val" not in splits:
+                splits.append("val")
+            elif parent_lower == "test" and "test" not in splits:
                 splits.append("test")
 
         # If no splits detected from filenames, default to train
@@ -342,7 +374,9 @@ class COCODataset(Dataset):
         for ann_file in self.annotation_files:
             # Filter by split if specified
             if split:
-                file_split = self._get_split_from_filename(ann_file.stem)
+                file_split = self._get_split_from_filename(
+                    ann_file.stem, ann_file.parent.name
+                )
                 if file_split != split:
                     continue
 
@@ -354,7 +388,9 @@ class COCODataset(Dataset):
                     continue
 
                 images = data.get("images", [])
-                file_split = self._get_split_from_filename(ann_file.stem)
+                file_split = self._get_split_from_filename(
+                    ann_file.stem, ann_file.parent.name
+                )
 
                 for img in images:
                     if not isinstance(img, dict) or "file_name" not in img:
@@ -371,6 +407,8 @@ class COCODataset(Dataset):
                         self.path / "images" / file_name,
                         self.path / file_split / file_name,
                         self.path / file_name,
+                        # Roboflow format: images alongside annotations
+                        ann_file.parent / file_name,
                     ]
 
                     for img_path in possible_paths:

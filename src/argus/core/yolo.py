@@ -1,5 +1,6 @@
 """YOLO dataset detection and handling."""
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -200,6 +201,12 @@ class YOLODataset(Dataset):
         if not class_dirs:
             return None
 
+        # Check if any directory contains COCO annotation files
+        # (Roboflow COCO datasets have train/valid/test dirs with JSON files)
+        for class_dir in class_dirs:
+            if cls._has_coco_annotation(class_dir):
+                return None  # Not a classification dataset
+
         # Check if these are class directories (contain images directly)
         class_names_set = set()
         for class_dir in class_dirs:
@@ -224,6 +231,28 @@ class YOLODataset(Dataset):
             splits=[],  # No splits for flat structure
             config_file=None,
         )
+
+    @staticmethod
+    def _has_coco_annotation(directory: Path) -> bool:
+        """Check if directory contains COCO annotation files.
+
+        Args:
+            directory: Directory to check.
+
+        Returns:
+            True if COCO annotation files are found, False otherwise.
+        """
+        for f in directory.glob("*.json"):
+            try:
+                with open(f, encoding="utf-8") as fp:
+                    data = json.load(fp)
+                if isinstance(data, dict) and any(
+                    k in data for k in ["images", "annotations", "categories"]
+                ):
+                    return True
+            except (json.JSONDecodeError, OSError):
+                pass
+        return False
 
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
         """Get the number of annotation instances per class, per split.
