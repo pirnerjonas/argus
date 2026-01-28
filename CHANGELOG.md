@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-01-28)
+
+### Features
+
+- Support Roboflow COCO format and improve YOLO classification detection
+  ([`902a59f`](https://github.com/pirnerjonas/argus/commit/902a59fbb506aa586d8677312d21ae240585b511))
+
+
 ## v1.4.0 (2026-01-26)
 
 ### Features
