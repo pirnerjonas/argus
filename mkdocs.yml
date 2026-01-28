@@ -64,5 +64,6 @@ nav:
       - Stats and counts: guides/stats.md
       - Visual inspection: guides/viewer.md
       - Splitting datasets: guides/splitting.md
+      - Filtering datasets: guides/filtering.md
   - Reference:
       - CLI reference: reference/cli.md
