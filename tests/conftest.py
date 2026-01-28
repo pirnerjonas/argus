@@ -696,6 +696,92 @@ def mask_dataset_missing_mask(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def roboflow_coco_dataset(tmp_path: Path) -> Path:
+    """Create a Roboflow COCO dataset with annotations in split directories.
+
+    Structure:
+        dataset/
+        ├── train/
+        │   ├── _annotations.coco.json
+        │   ├── img001.jpg
+        │   └── img002.jpg
+        ├── valid/
+        │   ├── _annotations.coco.json
+        │   └── img003.jpg
+        └── test/
+            ├── _annotations.coco.json
+            └── img004.jpg
+    """
+    dataset_path = tmp_path / "roboflow_coco"
+    dataset_path.mkdir()
+
+    # Create train split
+    train_dir = dataset_path / "train"
+    train_dir.mkdir()
+    train_coco = {
+        "info": {"description": "Roboflow train"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 640, "height": 480},
+            {"id": 2, "file_name": "img002.jpg", "width": 640, "height": 480},
+        ],
+        "annotations": [
+            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [100, 100, 50, 50]},
+            {"id": 2, "image_id": 2, "category_id": 2, "bbox": [200, 200, 60, 60]},
+        ],
+        "categories": [
+            {"id": 1, "name": "person", "supercategory": "human"},
+            {"id": 2, "name": "car", "supercategory": "vehicle"},
+        ],
+    }
+    (train_dir / "_annotations.coco.json").write_text(json.dumps(train_coco))
+    (train_dir / "img001.jpg").write_bytes(b"fake train image 1")
+    (train_dir / "img002.jpg").write_bytes(b"fake train image 2")
+
+    # Create valid split
+    valid_dir = dataset_path / "valid"
+    valid_dir.mkdir()
+    valid_coco = {
+        "info": {"description": "Roboflow valid"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img003.jpg", "width": 640, "height": 480},
+        ],
+        "annotations": [
+            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [150, 150, 40, 40]},
+        ],
+        "categories": [
+            {"id": 1, "name": "person", "supercategory": "human"},
+            {"id": 2, "name": "car", "supercategory": "vehicle"},
+        ],
+    }
+    (valid_dir / "_annotations.coco.json").write_text(json.dumps(valid_coco))
+    (valid_dir / "img003.jpg").write_bytes(b"fake valid image")
+
+    # Create test split
+    test_dir = dataset_path / "test"
+    test_dir.mkdir()
+    test_coco = {
+        "info": {"description": "Roboflow test"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img004.jpg", "width": 640, "height": 480},
+        ],
+        "annotations": [
+            {"id": 1, "image_id": 1, "category_id": 2, "bbox": [50, 50, 30, 30]},
+        ],
+        "categories": [
+            {"id": 1, "name": "person", "supercategory": "human"},
+            {"id": 2, "name": "car", "supercategory": "vehicle"},
+        ],
+    }
+    (test_dir / "_annotations.coco.json").write_text(json.dumps(test_coco))
+    (test_dir / "img004.jpg").write_bytes(b"fake test image")
+
+    return dataset_path
+
+
+@pytest.fixture
 def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     """Create a mask dataset where image and mask have different dimensions.
 

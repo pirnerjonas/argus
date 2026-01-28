@@ -59,6 +59,26 @@ dataset/
 If your annotation filenames include `train`, `val`, or `test`, Argus will treat
 those as splits. Otherwise it defaults to `train`.
 
+### Roboflow COCO
+
+Argus also supports the Roboflow variant of COCO format, where annotations live
+inside split directories:
+
+```text
+dataset/
+├── train/
+│   ├── _annotations.coco.json
+│   └── *.jpg
+├── valid/
+│   ├── _annotations.coco.json
+│   └── *.jpg
+└── test/
+    ├── _annotations.coco.json
+    └── *.jpg
+```
+
+Splits are detected from directory names (`train`, `valid`/`val`, `test`).
+
 ## Mask (semantic segmentation)
 
 Mask datasets are simple image + mask folders. Argus detects a few common

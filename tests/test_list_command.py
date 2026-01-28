@@ -70,6 +70,29 @@ class TestYOLODatasetDetection:
         dataset = YOLODataset.detect(tmp_path / "nonexistent")
         assert dataset is None
 
+    def test_yolo_cls_rejects_dirs_with_coco_json(self, tmp_path: Path):
+        """Test that YOLO classification rejects directories with COCO JSON files."""
+        dataset_path = tmp_path / "fake_cls"
+        dataset_path.mkdir()
+
+        # Create directories that look like classes but contain COCO JSON
+        import json
+
+        for name in ["train", "valid"]:
+            d = dataset_path / name
+            d.mkdir()
+            (d / "img.jpg").write_bytes(b"fake image")
+            coco_data = {
+                "images": [{"id": 1, "file_name": "img.jpg"}],
+                "annotations": [{"id": 1, "image_id": 1}],
+                "categories": [{"id": 1, "name": "obj"}],
+            }
+            (d / "_annotations.coco.json").write_text(json.dumps(coco_data))
+
+        # Should NOT be detected as YOLO classification
+        dataset = YOLODataset.detect(dataset_path)
+        assert dataset is None
+
 
 class TestCOCODatasetDetection:
     """Tests for COCO dataset detection."""
@@ -111,6 +134,56 @@ class TestCOCODatasetDetection:
         """Test that random files are not detected as COCO."""
         dataset = COCODataset.detect(random_files_directory)
         assert dataset is None
+
+    def test_detect_roboflow_coco_dataset(self, roboflow_coco_dataset: Path):
+        """Test detection of Roboflow COCO dataset with annotations in split dirs."""
+        dataset = COCODataset.detect(roboflow_coco_dataset)
+
+        assert dataset is not None
+        assert dataset.format == DatasetFormat.COCO
+        assert dataset.task == TaskType.DETECTION
+        assert dataset.num_classes == 2
+        assert dataset.class_names == ["person", "car"]
+
+    def test_roboflow_coco_splits(self, roboflow_coco_dataset: Path):
+        """Test that Roboflow COCO splits are detected from directory names."""
+        dataset = COCODataset.detect(roboflow_coco_dataset)
+
+        assert dataset is not None
+        assert "train" in dataset.splits
+        assert "val" in dataset.splits
+        assert "test" in dataset.splits
+
+    def test_roboflow_coco_image_paths(self, roboflow_coco_dataset: Path):
+        """Test that Roboflow COCO images are found alongside annotations."""
+        dataset = COCODataset.detect(roboflow_coco_dataset)
+
+        assert dataset is not None
+
+        # Get all image paths
+        all_images = dataset.get_image_paths()
+        assert len(all_images) == 4
+
+        # Get images per split
+        train_images = dataset.get_image_paths("train")
+        assert len(train_images) == 2
+
+        val_images = dataset.get_image_paths("val")
+        assert len(val_images) == 1
+
+        test_images = dataset.get_image_paths("test")
+        assert len(test_images) == 1
+
+    def test_roboflow_not_detected_as_yolo_cls(self, roboflow_coco_dataset: Path):
+        """Test that Roboflow COCO is not falsely detected as YOLO classification."""
+        # YOLO should NOT detect this as a classification dataset
+        yolo_dataset = YOLODataset.detect(roboflow_coco_dataset)
+        assert yolo_dataset is None
+
+        # COCO SHOULD detect it
+        coco_dataset = COCODataset.detect(roboflow_coco_dataset)
+        assert coco_dataset is not None
+        assert coco_dataset.format == DatasetFormat.COCO
 
 
 class TestDiscoverDatasets:
