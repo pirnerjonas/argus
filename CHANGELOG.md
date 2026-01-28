@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.1 (2026-01-28)
+
+### Bug Fixes
+
+- Add missing documentation for filter command
+  ([`dc41fbb`](https://github.com/pirnerjonas/argus/commit/dc41fbb724faf2024ec9f1430e2af0a6af000d21))
+
+
 ## v1.5.0 (2026-01-28)
 
 ### Features
