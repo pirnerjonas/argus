@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.3 (2026-02-03)
+
+### Bug Fixes
+
+- Handle "valid" directory name for YOLO datasets
+  ([`9ba112c`](https://github.com/pirnerjonas/argus/commit/9ba112c6b1baf2fd4977aa78edfee5bbfa057d45))
+
+
 ## v1.5.2 (2026-02-03)
 
 ### Bug Fixes
