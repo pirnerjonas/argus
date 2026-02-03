@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.2 (2026-02-03)
+
+### Bug Fixes
+
+- Prevent double counting in COCO stats
+  ([`90436b1`](https://github.com/pirnerjonas/argus/commit/90436b13d64a50821a39ee3bb9468bfa59e8e0ea))
+
+
 ## v1.5.1 (2026-01-28)
 
 ### Bug Fixes
