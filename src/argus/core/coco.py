@@ -65,22 +65,22 @@ class COCODataset(Dataset):
         Returns:
             List of annotation file paths.
         """
-        annotation_files = []
+        annotation_files: set[Path] = set()
 
         # Check annotations/ directory first
         annotations_dir = path / "annotations"
         if annotations_dir.is_dir():
-            annotation_files.extend(annotations_dir.glob("*.json"))
+            annotation_files.update(annotations_dir.glob("*.json"))
 
         # Also check root directory for single annotation file
-        annotation_files.extend(path.glob("*.json"))
+        annotation_files.update(path.glob("*.json"))
 
         # Check split directories for Roboflow COCO format
         for split_name in ["train", "valid", "val", "test"]:
             split_dir = path / split_name
             if split_dir.is_dir():
-                annotation_files.extend(split_dir.glob("*annotations*.json"))
-                annotation_files.extend(split_dir.glob("*coco*.json"))
+                annotation_files.update(split_dir.glob("*annotations*.json"))
+                annotation_files.update(split_dir.glob("*coco*.json"))
 
         # Filter to only include files that might be COCO annotations
         # (exclude package.json, tsconfig.json, etc.)
