@@ -485,8 +485,16 @@ class YOLODataset(Dataset):
         """
         splits = []
 
+        # Map of canonical split names to alternative directory names
+        # (e.g., Roboflow uses "valid" instead of "val")
+        split_aliases = {
+            "train": ["train"],
+            "val": ["val", "valid"],
+            "test": ["test"],
+        }
+
         # Check config-defined paths first
-        for split_name in ["train", "val", "test"]:
+        for split_name, aliases in split_aliases.items():
             if split_name in config:
                 split_path = config[split_name]
                 if split_path:
@@ -497,17 +505,19 @@ class YOLODataset(Dataset):
                         continue
 
             # Fallback: check common directory structures
-            # Pattern 1: images/train/, images/val/
-            if (path / "images" / split_name).is_dir():
-                splits.append(split_name)
-                continue
+            for alias in aliases:
+                # Pattern 1: images/train/, images/val/, images/valid/
+                if (path / "images" / alias).is_dir():
+                    splits.append(split_name)
+                    break
 
-            # Pattern 2: train/, val/ (flat structure with images/ and labels/)
-            if (path / split_name).is_dir():
-                # Make sure it's not a classification dataset
-                if (path / "images").is_dir() or (path / "labels").is_dir():
-                    continue
-                splits.append(split_name)
+                # Pattern 2: train/, val/, valid/ (flat structure)
+                if (path / alias).is_dir():
+                    # Make sure it's not a classification dataset
+                    if (path / "images").is_dir() or (path / "labels").is_dir():
+                        continue
+                    splits.append(split_name)
+                    break
 
         return splits
 
