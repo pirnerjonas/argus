@@ -45,12 +45,15 @@ The filter command works with all dataset formats:
 | YOLO Detection | Yes | Labels remapped to new class IDs |
 | YOLO Segmentation | Yes | Polygon annotations preserved |
 | YOLO Classification | Yes | Only selected class directories copied |
+| YOLO (Roboflow layout) | Yes | Reads `{split}/images/` layout, writes standard layout |
 | COCO | Yes | Annotations and category IDs remapped |
 | Mask | Yes | Pixel values remapped to new class IDs |
 
 ## Output layout
 
-The output preserves the original dataset structure with train/val/test splits.
+The output always uses the standard dataset layout, even when the source uses a
+different directory structure (e.g. Roboflow YOLO). This normalises the output
+so it can be used directly with training frameworks.
 
 YOLO output:
 

@@ -657,3 +657,132 @@ def test_filter_command_output_exists_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "already exists" in result.stdout
+
+
+# ============================================================================
+# Roboflow YOLO Layout Filter Tests
+# ============================================================================
+
+
+def _create_roboflow_yolo_dataset(dataset_path: Path) -> None:
+    """Create a Roboflow YOLO dataset with {split}/images/ layout."""
+    dataset_path.mkdir(parents=True)
+
+    (dataset_path / "data.yaml").write_text(
+        "\n".join(
+            [
+                "names:",
+                "- ball",
+                "- player",
+                "- referee",
+                "nc: 3",
+                "train: ../train/images",
+                "val: ../valid/images",
+                "test: ../test/images",
+            ]
+        )
+    )
+
+    # Train split
+    (dataset_path / "train" / "images").mkdir(parents=True)
+    (dataset_path / "train" / "labels").mkdir(parents=True)
+    for idx in range(1, 5):
+        (dataset_path / "train" / "images" / f"img{idx:03d}.jpg").write_bytes(
+            b"fake image"
+        )
+        if idx == 1:
+            label = "0 0.5 0.5 0.1 0.1\n1 0.3 0.3 0.2 0.4\n"
+        elif idx == 2:
+            label = "0 0.6 0.6 0.15 0.15\n"
+        elif idx == 3:
+            label = "1 0.4 0.4 0.2 0.3\n2 0.7 0.7 0.1 0.1\n"
+        else:
+            label = ""
+        (dataset_path / "train" / "labels" / f"img{idx:03d}.txt").write_text(label)
+
+    # Valid split
+    (dataset_path / "valid" / "images").mkdir(parents=True)
+    (dataset_path / "valid" / "labels").mkdir(parents=True)
+    for idx in range(1, 3):
+        (dataset_path / "valid" / "images" / f"img{idx:03d}.jpg").write_bytes(
+            b"fake image"
+        )
+        if idx == 1:
+            label = "0 0.5 0.5 0.1 0.1\n"
+        else:
+            label = "1 0.3 0.3 0.2 0.2\n2 0.6 0.6 0.1 0.1\n"
+        (dataset_path / "valid" / "labels" / f"img{idx:03d}.txt").write_text(label)
+
+
+def test_filter_roboflow_yolo_single_class(tmp_path: Path) -> None:
+    """Test filtering Roboflow YOLO dataset to single class."""
+    dataset_path = tmp_path / "roboflow_yolo"
+    _create_roboflow_yolo_dataset(dataset_path)
+
+    dataset = YOLODataset.detect(dataset_path)
+    assert dataset is not None
+    assert dataset._roboflow_layout is True
+
+    output_path = tmp_path / "filtered"
+    stats = filter_yolo_dataset(dataset, output_path, classes=["ball"])
+
+    # Should have 4 train + 2 val images
+    assert stats["images"] == 6
+
+    # Output should use standard YOLO layout
+    assert (output_path / "data.yaml").exists()
+    assert (output_path / "images" / "train").is_dir()
+    assert (output_path / "labels" / "train").is_dir()
+
+    # Check data.yaml has only 'ball' class
+    with open(output_path / "data.yaml") as f:
+        config = yaml.safe_load(f)
+    assert config["names"] == {0: "ball"}
+
+    # Check filtered labels only contain class 0 (remapped ball)
+    label_file = output_path / "labels" / "train" / "img001.txt"
+    content = label_file.read_text().strip()
+    assert content == "0 0.5 0.5 0.1 0.1"
+
+
+def test_filter_roboflow_yolo_no_background(tmp_path: Path) -> None:
+    """Test filtering Roboflow YOLO with --no-background flag."""
+    dataset_path = tmp_path / "roboflow_yolo"
+    _create_roboflow_yolo_dataset(dataset_path)
+
+    dataset = YOLODataset.detect(dataset_path)
+    assert dataset is not None
+
+    output_path = tmp_path / "filtered"
+    stats = filter_yolo_dataset(
+        dataset, output_path, classes=["ball"], no_background=True
+    )
+
+    # img003 has only player+referee, img004 is empty -> both skipped in train
+    # val/img002 has only player+referee -> skipped
+    assert stats["skipped"] == 3
+    assert stats["images"] == 3
+
+
+def test_filter_roboflow_yolo_cli(tmp_path: Path) -> None:
+    """Test filter CLI command with Roboflow YOLO dataset."""
+    dataset_path = tmp_path / "roboflow_yolo"
+    _create_roboflow_yolo_dataset(dataset_path)
+
+    output_path = tmp_path / "cli_filtered"
+    result = runner.invoke(
+        app,
+        [
+            "filter",
+            "--dataset-path",
+            str(dataset_path),
+            "--output",
+            str(output_path),
+            "--classes",
+            "ball",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Filtering complete" in result.stdout
+    assert (output_path / "data.yaml").exists()

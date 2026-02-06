@@ -85,15 +85,13 @@ def _filter_yolo_detection_segmentation(
 
     # Collect all image/label pairs
     all_pairs: list[tuple[Path, Path, str]] = []
-    labels_root = dataset.path / "labels"
 
     for split in splits:
         if has_splits:
-            images_dir = dataset.path / "images" / split
-            labels_dir = labels_root / split
+            images_dir, labels_dir = dataset.get_split_dirs(split)
         else:
             images_dir = dataset.path / "images"
-            labels_dir = labels_root
+            labels_dir = dataset.path / "labels"
 
         if not images_dir.is_dir():
             continue
