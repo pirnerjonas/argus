@@ -6,7 +6,7 @@
 argus-cv --help
 ```
 
-Argus uses subcommands: `list`, `stats`, `view`, and `split`.
+Argus uses subcommands: `list`, `stats`, `view`, `split`, and `convert`.
 
 ## list
 
@@ -64,3 +64,22 @@ Options:
 - `--output-path`, `-o`: output directory (default: "splits" inside dataset path)
 - `--ratio`, `-r`: train/val/test ratio (default: 0.8,0.1,0.1)
 - `--seed`: random seed (default: 42)
+
+## convert
+
+Convert a dataset from one format to another. Currently supports converting
+MaskDataset to YOLO segmentation format.
+
+```bash
+argus-cv convert --input-path /path/to/masks \
+  --output-path /path/to/output \
+  --to yolo-seg
+```
+
+Options:
+
+- `--input-path`, `-i`: source dataset path (default: ".")
+- `--output-path`, `-o`: output directory (default: "converted" next to the input path)
+- `--to`: target format (currently only `yolo-seg`)
+- `--epsilon-factor`, `-e`: polygon simplification factor (default: 0.005)
+- `--min-area`, `-a`: minimum contour area in pixels (default: 100.0)
