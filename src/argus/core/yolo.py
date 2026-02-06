@@ -41,6 +41,7 @@ class YOLODataset(Dataset):
 
     config_file: Path | None = None
     format: DatasetFormat = field(default=DatasetFormat.YOLO, init=False)
+    _roboflow_layout: bool = field(default=False, repr=False)
 
     @classmethod
     def detect(cls, path: Path) -> "YOLODataset | None":
@@ -108,12 +109,12 @@ class YOLODataset(Dataset):
                 num_classes = len(class_names)
 
                 # Detect available splits
-                splits = cls._detect_splits(path, config)
+                splits, is_roboflow = cls._detect_splits(path, config)
 
                 # Determine task type (detection vs segmentation)
-                task = cls._determine_task_type(path, config)
+                task = cls._determine_task_type(path, config, is_roboflow)
 
-                return cls(
+                dataset = cls(
                     path=path,
                     task=task,
                     num_classes=num_classes,
@@ -121,6 +122,8 @@ class YOLODataset(Dataset):
                     splits=splits,
                     config_file=yaml_file,
                 )
+                dataset._roboflow_layout = is_roboflow
+                return dataset
 
             except (yaml.YAMLError, OSError):
                 continue
@@ -254,6 +257,32 @@ class YOLODataset(Dataset):
                 pass
         return False
 
+    def get_split_dirs(self, split: str) -> tuple[Path, Path]:
+        """Get the images and labels directories for a given split.
+
+        Handles both standard YOLO layout (images/{split}/, labels/{split}/)
+        and Roboflow layout ({split}/images/, {split}/labels/).
+
+        Args:
+            split: Split name (e.g. "train", "val", "test").
+
+        Returns:
+            Tuple of (images_dir, labels_dir).
+        """
+        if self._roboflow_layout:
+            # Roboflow uses "valid" instead of "val"
+            actual_dir = split
+            if split == "val" and not (self.path / "val").is_dir():
+                actual_dir = "valid"
+            return (
+                self.path / actual_dir / "images",
+                self.path / actual_dir / "labels",
+            )
+        return (
+            self.path / "images" / split,
+            self.path / "labels" / split,
+        )
+
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
         """Get the number of annotation instances per class, per split.
 
@@ -275,10 +304,14 @@ class YOLODataset(Dataset):
         # Build class_id -> class_name mapping
         id_to_name = {i: name for i, name in enumerate(self.class_names)}
 
-        labels_root = self.path / "labels"
-        has_split_label_dirs = any((labels_root / s).is_dir() for s in self.splits)
+        # Determine which label dirs actually exist
+        has_split_label_dirs = (
+            any(self.get_split_dirs(s)[1].is_dir() for s in self.splits)
+            if self.splits
+            else False
+        )
 
-        # If splits are declared but no labels/{split} folders exist, treat as unsplit.
+        # If splits are declared but no label folders exist, treat as unsplit.
         if self.splits and not has_split_label_dirs:
             splits_to_process = ["unsplit"]
         else:
@@ -289,7 +322,10 @@ class YOLODataset(Dataset):
             split_counts: dict[str, int] = {}
 
             # Find label directory for this split
-            label_dir = labels_root if split == "unsplit" else labels_root / split
+            if split == "unsplit":
+                label_dir = self.path / "labels"
+            else:
+                _, label_dir = self.get_split_dirs(split)
 
             if not label_dir.is_dir():
                 continue
@@ -392,8 +428,11 @@ class YOLODataset(Dataset):
 
         counts: dict[str, dict[str, int]] = {}
 
-        labels_root = self.path / "labels"
-        has_split_label_dirs = any((labels_root / s).is_dir() for s in self.splits)
+        has_split_label_dirs = (
+            any(self.get_split_dirs(s)[1].is_dir() for s in self.splits)
+            if self.splits
+            else False
+        )
 
         # If splits are declared but no labels/{split} folders exist, treat as unsplit.
         if self.splits and not has_split_label_dirs:
@@ -402,7 +441,10 @@ class YOLODataset(Dataset):
             splits_to_process = self.splits if self.splits else ["unsplit"]
 
         for split in splits_to_process:
-            label_dir = labels_root if split == "unsplit" else labels_root / split
+            if split == "unsplit":
+                label_dir = self.path / "labels"
+            else:
+                _, label_dir = self.get_split_dirs(split)
 
             if not label_dir.is_dir():
                 continue
@@ -473,7 +515,7 @@ class YOLODataset(Dataset):
         return counts
 
     @classmethod
-    def _detect_splits(cls, path: Path, config: dict) -> list[str]:
+    def _detect_splits(cls, path: Path, config: dict) -> tuple[list[str], bool]:
         """Detect available splits from config and filesystem.
 
         Args:
@@ -481,48 +523,80 @@ class YOLODataset(Dataset):
             config: Parsed YAML config.
 
         Returns:
-            List of available split names.
+            Tuple of (list of available split names, is_roboflow_layout).
         """
-        splits = []
+        splits: list[str] = []
+        is_roboflow = False
 
-        # Map of canonical split names to alternative directory names
-        # (e.g., Roboflow uses "valid" instead of "val")
-        split_aliases = {
+        # Detect Roboflow layout: {split}/images/ exists at the top level
+        roboflow_dirs = {"train", "val", "valid", "test"}
+        for d in roboflow_dirs:
+            if (path / d / "images").is_dir():
+                is_roboflow = True
+                break
+
+        # Config key aliases: Roboflow uses "val" key pointing to "../valid/images"
+        config_key_aliases = {
             "train": ["train"],
             "val": ["val", "valid"],
             "test": ["test"],
         }
 
-        # Check config-defined paths first
-        for split_name, aliases in split_aliases.items():
-            if split_name in config:
-                split_path = config[split_name]
-                if split_path:
-                    # Handle relative paths
-                    full_path = path / split_path
-                    if full_path.exists():
-                        splits.append(split_name)
-                        continue
+        for split_name, aliases in config_key_aliases.items():
+            found = False
 
-            # Fallback: check common directory structures
+            # Check config-defined paths
             for alias in aliases:
-                # Pattern 1: images/train/, images/val/, images/valid/
-                if (path / "images" / alias).is_dir():
-                    splits.append(split_name)
-                    break
+                if alias in config:
+                    config_val = config[alias]
+                    if config_val:
+                        full_path = path / config_val
+                        if full_path.exists():
+                            splits.append(split_name)
+                            found = True
+                            break
 
-                # Pattern 2: train/, val/, valid/ (flat structure)
-                if (path / alias).is_dir():
-                    # Make sure it's not a classification dataset
+            if found:
+                continue
+
+            if is_roboflow:
+                # Roboflow layout: {split}/images/
+                # Check "valid" as alias for "val"
+                dirs_to_check = (
+                    [split_name, "valid"] if split_name == "val" else [split_name]
+                )
+                for d in dirs_to_check:
+                    if (path / d / "images").is_dir():
+                        splits.append(split_name)
+                        found = True
+                        break
+                if found:
+                    continue
+            else:
+                # Standard layout: images/{split}/ (also check "valid" alias)
+                dirs_to_check = (
+                    [split_name, "valid"] if split_name == "val" else [split_name]
+                )
+                for alias in dirs_to_check:
+                    if (path / "images" / alias).is_dir():
+                        splits.append(split_name)
+                        found = True
+                        break
+                if found:
+                    continue
+
+                # Pattern: train/, val/ (flat structure without images/ or labels/)
+                if (path / split_name).is_dir():
                     if (path / "images").is_dir() or (path / "labels").is_dir():
                         continue
                     splits.append(split_name)
-                    break
 
-        return splits
+        return splits, is_roboflow
 
     @classmethod
-    def _determine_task_type(cls, path: Path, config: dict) -> TaskType:
+    def _determine_task_type(
+        cls, path: Path, config: dict, is_roboflow: bool = False
+    ) -> TaskType:
         """Determine if dataset is detection or segmentation.
 
         Detection labels have 5 columns: class x_center y_center width height
@@ -531,6 +605,7 @@ class YOLODataset(Dataset):
         Args:
             path: Dataset root path.
             config: Parsed YAML config.
+            is_roboflow: Whether the dataset uses Roboflow layout.
 
         Returns:
             TaskType.DETECTION or TaskType.SEGMENTATION.
@@ -539,11 +614,17 @@ class YOLODataset(Dataset):
         label_dirs = []
 
         # Check common label locations
-        for split in ["train", "val", "test"]:
-            # Pattern: labels/train/
+        for split in ["train", "val", "valid", "test"]:
+            # Standard layout: labels/train/
             label_dir = path / "labels" / split
             if label_dir.is_dir():
                 label_dirs.append(label_dir)
+
+            # Roboflow layout: train/labels/
+            if is_roboflow:
+                label_dir = path / split / "labels"
+                if label_dir.is_dir():
+                    label_dirs.append(label_dir)
 
         # Pattern: labels/ (flat)
         labels_dir = path / "labels"
@@ -589,10 +670,13 @@ class YOLODataset(Dataset):
         image_paths: list[Path] = []
         seen: set[Path] = set()
 
-        # Decide how to interpret splits. If splits are declared but no images/{split}
-        # directories exist, treat the dataset as unsplit to avoid counting the same
-        # images multiple times.
-        has_split_image_dirs = any((images_root / s).is_dir() for s in self.splits)
+        # Decide how to interpret splits. Check if split image dirs exist
+        # using get_split_dirs for layout-aware resolution.
+        has_split_image_dirs = (
+            any(self.get_split_dirs(s)[0].is_dir() for s in self.splits)
+            if self.splits
+            else False
+        )
 
         if split:
             splits_to_search = [split]
@@ -607,7 +691,7 @@ class YOLODataset(Dataset):
             if s == "unsplit":
                 image_dir = images_root
             else:
-                image_dir = images_root / s
+                image_dir = self.get_split_dirs(s)[0]
                 if not image_dir.is_dir():
                     # If a split was explicitly requested but the folder doesn't
                     # exist, fall back to images/.
