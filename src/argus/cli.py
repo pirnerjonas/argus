@@ -35,7 +35,7 @@ from argus.core.split import (
 console = Console()
 
 app = typer.Typer(
-    name="argus",
+    name="argus-cv",
     help="Vision AI dataset toolkit for working with YOLO and COCO datasets.",
     no_args_is_help=True,
 )
