@@ -20,7 +20,14 @@ jobs:
         uses: j178/prek-action@v1
       
       - name: Capture commit message
-        run: git log -1 --pretty=%B > /tmp/commit-msg.txt
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && [ -n "${PR_HEAD_SHA}" ]; then
+            git log -1 --pretty=%B "${PR_HEAD_SHA}" > /tmp/commit-msg.txt
+          else
+            git log -1 --pretty=%B > /tmp/commit-msg.txt
+          fi
 
       - name: Run commit message checks
         uses: j178/prek-action@v1
