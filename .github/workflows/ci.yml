@@ -18,21 +18,6 @@ jobs:
 
       - name: Run pre-commit checks
         uses: j178/prek-action@v1
-      
-      - name: Capture commit message
-        env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && [ -n "${PR_HEAD_SHA}" ]; then
-            git log -1 --pretty=%B "${PR_HEAD_SHA}" > /tmp/commit-msg.txt
-          else
-            git log -1 --pretty=%B > /tmp/commit-msg.txt
-          fi
-
-      - name: Run commit message checks
-        uses: j178/prek-action@v1
-        with:
-          extra_args: "conventional-pre-commit --hook-stage commit-msg --commit-msg-filename /tmp/commit-msg.txt"
 
   test:
     runs-on: ubuntu-latest
@@ -54,3 +39,14 @@ jobs:
         run: |
           uv sync --only-group dev
           uv run pytest
+
+  semantic-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
