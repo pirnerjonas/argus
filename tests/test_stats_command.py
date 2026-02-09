@@ -281,3 +281,73 @@ class TestStatsCommand:
         assert result.exit_code == 0
         assert "YOLO" in result.stdout
         assert "detection" in result.stdout
+
+
+class TestRoboflowYOLO:
+    """Tests for Roboflow YOLO layout detection and stats."""
+
+    def test_detect_roboflow_layout(self, roboflow_yolo_dataset: Path) -> None:
+        """Test that Roboflow YOLO layout is detected correctly."""
+        dataset = YOLODataset.detect(roboflow_yolo_dataset)
+        assert dataset is not None
+        assert dataset._roboflow_layout is True
+        assert "train" in dataset.splits
+        assert "val" in dataset.splits
+        assert "test" in dataset.splits
+        assert dataset.class_names == ["ball", "player", "referee"]
+
+    def test_get_instance_counts_roboflow(self, roboflow_yolo_dataset: Path) -> None:
+        """Test instance counting with Roboflow layout."""
+        dataset = YOLODataset.detect(roboflow_yolo_dataset)
+        assert dataset is not None
+
+        counts = dataset.get_instance_counts()
+
+        assert "train" in counts
+        assert "val" in counts
+        assert counts["train"]["ball"] == 2
+        assert counts["train"]["player"] == 1
+        assert counts["val"]["player"] == 1
+        assert counts["val"]["referee"] == 1
+
+    def test_get_image_counts_roboflow(self, roboflow_yolo_dataset: Path) -> None:
+        """Test image counting with Roboflow layout."""
+        dataset = YOLODataset.detect(roboflow_yolo_dataset)
+        assert dataset is not None
+
+        counts = dataset.get_image_counts()
+
+        assert "train" in counts
+        assert counts["train"]["total"] == 2
+        assert counts["train"]["background"] == 0
+        assert "val" in counts
+        assert counts["val"]["total"] == 1
+        assert counts["val"]["background"] == 0
+        assert "test" in counts
+        assert counts["test"]["total"] == 1
+        assert counts["test"]["background"] == 1
+
+    def test_get_image_paths_roboflow(self, roboflow_yolo_dataset: Path) -> None:
+        """Test getting image paths with Roboflow layout."""
+        dataset = YOLODataset.detect(roboflow_yolo_dataset)
+        assert dataset is not None
+
+        # All images
+        all_paths = dataset.get_image_paths()
+        assert len(all_paths) == 4
+
+        # Single split
+        train_paths = dataset.get_image_paths(split="train")
+        assert len(train_paths) == 2
+
+        val_paths = dataset.get_image_paths(split="val")
+        assert len(val_paths) == 1
+
+    def test_stats_command_roboflow(self, roboflow_yolo_dataset: Path) -> None:
+        """Test stats CLI command with Roboflow YOLO dataset."""
+        result = runner.invoke(app, ["stats", "-d", str(roboflow_yolo_dataset)])
+
+        assert result.exit_code == 0
+        assert "ball" in result.stdout
+        assert "player" in result.stdout
+        assert "YOLO" in result.stdout

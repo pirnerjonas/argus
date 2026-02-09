@@ -21,10 +21,18 @@ Argus prints a table by class and split. It also includes a summary with:
 Empty label files or images without annotations can skew training. Argus counts
 those so you can decide if you want to filter or re-label.
 
+## Roboflow YOLO datasets
+
+Roboflow exports YOLO datasets with a different directory layout
+(`{split}/images/` instead of `images/{split}/`). Argus detects this
+automatically — no extra flags needed. The `valid` directory is treated as the
+`val` split.
+
 ## Common problems
 
 If Argus prints "No annotations found", check:
 
-- YOLO: `labels/` exists and matches `images/`.
+- YOLO: `labels/` exists and matches `images/`. For Roboflow YOLO datasets,
+  labels should be at `{split}/labels/`.
 - COCO: annotation JSON files are valid and contain `annotations`.
 - Mask: masks are `.png` files and match the image file names.

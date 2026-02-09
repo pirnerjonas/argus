@@ -782,6 +782,76 @@ def roboflow_coco_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def roboflow_yolo_dataset(tmp_path: Path) -> Path:
+    """Create a Roboflow YOLO dataset with {split}/images/ layout.
+
+    Structure:
+        dataset/
+        ├── data.yaml
+        ├── train/
+        │   ├── images/
+        │   │   ├── img001.jpg
+        │   │   └── img002.jpg
+        │   └── labels/
+        │       ├── img001.txt
+        │       └── img002.txt
+        ├── valid/
+        │   ├── images/
+        │   │   └── img003.jpg
+        │   └── labels/
+        │       └── img003.txt
+        └── test/
+            ├── images/
+            │   └── img004.jpg
+            └── labels/
+                └── img004.txt
+    """
+    dataset_path = tmp_path / "roboflow_yolo"
+    dataset_path.mkdir()
+
+    # Create data.yaml with Roboflow-style paths
+    yaml_content = (
+        "names:\n"
+        "- ball\n"
+        "- player\n"
+        "- referee\n"
+        "nc: 3\n"
+        "train: ../train/images\n"
+        "val: ../valid/images\n"
+        "test: ../test/images\n"
+    )
+    (dataset_path / "data.yaml").write_text(yaml_content)
+
+    # Train split
+    (dataset_path / "train" / "images").mkdir(parents=True)
+    (dataset_path / "train" / "labels").mkdir(parents=True)
+    (dataset_path / "train" / "images" / "img001.jpg").write_bytes(b"fake image")
+    (dataset_path / "train" / "images" / "img002.jpg").write_bytes(b"fake image")
+    (dataset_path / "train" / "labels" / "img001.txt").write_text(
+        "0 0.5 0.5 0.1 0.1\n1 0.3 0.3 0.2 0.4\n"
+    )
+    (dataset_path / "train" / "labels" / "img002.txt").write_text(
+        "0 0.6 0.6 0.15 0.15\n"
+    )
+
+    # Valid split (Roboflow uses "valid" instead of "val")
+    (dataset_path / "valid" / "images").mkdir(parents=True)
+    (dataset_path / "valid" / "labels").mkdir(parents=True)
+    (dataset_path / "valid" / "images" / "img003.jpg").write_bytes(b"fake image")
+    (dataset_path / "valid" / "labels" / "img003.txt").write_text(
+        "1 0.4 0.4 0.2 0.3\n2 0.7 0.7 0.1 0.1\n"
+    )
+
+    # Test split
+    (dataset_path / "test" / "images").mkdir(parents=True)
+    (dataset_path / "test" / "labels").mkdir(parents=True)
+    (dataset_path / "test" / "images" / "img004.jpg").write_bytes(b"fake image")
+    (dataset_path / "test" / "labels" / "img004.txt").write_text("")
+
+    return dataset_path
+
+
+@pytest.fixture
 def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     """Create a mask dataset where image and mask have different dimensions.
 

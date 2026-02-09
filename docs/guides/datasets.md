@@ -32,6 +32,31 @@ dataset/
 └── labels/
 ```
 
+### Roboflow YOLO
+
+Argus also supports the Roboflow variant of the YOLO format, where images and
+labels live inside split directories instead of under a top-level `images/` and
+`labels/` folder:
+
+```text
+dataset/
+├── data.yaml
+├── train/
+│   ├── images/
+│   └── labels/
+├── valid/
+│   ├── images/
+│   └── labels/
+└── test/
+    ├── images/
+    └── labels/
+```
+
+Roboflow uses `valid` instead of `val` for the validation split. Argus detects
+this automatically and normalises it to `val` internally. The `data.yaml` paths
+typically use `../train/images` style references — Argus handles these by
+falling back to filesystem probing when the relative paths do not resolve.
+
 Argus infers the task type by scanning a few label files:
 
 - 5 values per line: detection
