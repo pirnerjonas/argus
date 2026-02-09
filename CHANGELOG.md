@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.5.4 (2026-02-09)
+
+### Bug Fixes
+
+- Support Roboflow YOLO directory layout in filter and stats
+  ([#39](https://github.com/pirnerjonas/argus/pull/39),
+  [`d585e98`](https://github.com/pirnerjonas/argus/commit/d585e980c3545b865c5191ec61b2bff7c2d42b8e))
+
+
 ## v1.5.3 (2026-02-03)
 
 ### Bug Fixes

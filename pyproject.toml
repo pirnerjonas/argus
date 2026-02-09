@@ -1,6 +1,6 @@
 [project]
 name = "argus-cv"
-version = "1.5.3"
+version = "1.5.4"
 description = "CLI tool for working with vision AI datasets"
 readme = "README.md"
 requires-python = ">=3.10"
