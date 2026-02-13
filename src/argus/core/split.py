@@ -184,6 +184,21 @@ def split_yolo_dataset(
     stratify: bool,
     seed: int,
 ) -> dict[str, int]:
+    """Split a YOLO dataset into train/val/test subsets.
+
+    Args:
+        dataset: Source YOLO dataset.
+        output_path: Directory where the split dataset is written.
+        ratios: Train/val/test ratios as fractions summing to 1.
+        stratify: If True, use class-aware stratified assignment.
+        seed: Random seed for deterministic split assignment.
+
+    Returns:
+        Mapping of split name (train/val/test) to number of assigned images.
+
+    Raises:
+        ValueError: If no images are found in the source dataset.
+    """
     image_paths = dataset.get_image_paths()
     if not image_paths:
         raise ValueError("No images found in the dataset.")
@@ -252,6 +267,22 @@ def split_coco_dataset(
     stratify: bool,
     seed: int,
 ) -> dict[str, int]:
+    """Split a COCO dataset into train/val/test annotation files and images.
+
+    Args:
+        dataset: Source COCO dataset.
+        annotation_file: COCO annotation JSON file to split.
+        output_path: Directory where the split dataset is written.
+        ratios: Train/val/test ratios as fractions summing to 1.
+        stratify: If True, use category-aware stratified assignment.
+        seed: Random seed for deterministic split assignment.
+
+    Returns:
+        Mapping of split name (train/val/test) to number of assigned images.
+
+    Raises:
+        ValueError: If an image referenced in annotations cannot be found.
+    """
     data = json.loads(annotation_file.read_text(encoding="utf-8"))
     images = data.get("images", [])
     annotations = data.get("annotations", [])

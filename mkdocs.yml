@@ -30,6 +30,13 @@ theme:
 
 plugins:
   - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            heading_level: 2
 
 markdown_extensions:
   - admonition
@@ -67,3 +74,4 @@ nav:
       - Filtering datasets: guides/filtering.md
   - Reference:
       - CLI reference: reference/cli.md
+      - Python API: reference/python-api.md
