@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.5 (2026-02-13)
+
+### Bug Fixes
+
+- Update documentation workflow to use uv for dependency management
+  ([`4be8fa9`](https://github.com/pirnerjonas/argus/commit/4be8fa99bd387672bc5055b9dad263d8dbe24172))
+
+
 ## v1.5.4 (2026-02-09)
 
 ### Bug Fixes
