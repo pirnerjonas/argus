@@ -79,3 +79,9 @@ commands will usually just work.
 Head to the formats guide for the full layouts and edge cases.
 
 [Explore dataset formats](guides/datasets.md){ .md-button .md-button--primary }
+
+## Library usage
+
+Using Argus as a Python library? See the API reference for dataset classes and core operations.
+
+[Open Python API reference](reference/python-api.md){ .md-button }

@@ -4,6 +4,10 @@ Vision AI dataset toolkit for working with YOLO, COCO, and semantic mask dataset
 
 **[Documentation](https://pirnerjonas.github.io/argus/)**
 
+Library users can start with the Python API reference:
+
+- https://pirnerjonas.github.io/argus/reference/python-api/
+
 ## Installation
 
 ```bash
