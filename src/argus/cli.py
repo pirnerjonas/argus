@@ -449,6 +449,40 @@ def view(
         console.print("[green]Viewer closed.[/green]")
         return
 
+    # Handle COCO RLE datasets with mask overlay viewer
+    if isinstance(dataset, COCODataset) and dataset.has_rle:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            transient=True,
+        ) as progress:
+            progress.add_task("Loading images...", total=None)
+            image_paths = dataset.get_image_paths(split)
+
+        if not image_paths:
+            console.print("[yellow]No images found in the dataset.[/yellow]")
+            return
+
+        console.print(
+            f"[green]Found {len(image_paths)} images. "
+            f"Opening mask viewer...[/green]\n"
+            "[dim]Controls: \u2190 / \u2192 or P / N to navigate, "
+            "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle overlay, "
+            "Q / ESC to quit[/dim]"
+        )
+
+        viewer = _MaskViewer(
+            image_paths=image_paths,
+            dataset=dataset,
+            class_colors=class_colors,
+            window_name=f"Argus Mask Viewer - {dataset_path.name}",
+            opacity=opacity,
+        )
+        viewer.run()
+        console.print("[green]Viewer closed.[/green]")
+        return
+
     # Handle classification datasets with grid viewer
     if dataset.task == TaskType.CLASSIFICATION:
         # Use first split if specified, otherwise let get_images_by_class handle it
@@ -1372,7 +1406,7 @@ class _MaskViewer:
     def __init__(
         self,
         image_paths: list[Path],
-        dataset: MaskDataset,
+        dataset: MaskDataset | COCODataset,
         class_colors: dict[str, tuple[int, int, int]],
         window_name: str,
         opacity: float = 0.5,

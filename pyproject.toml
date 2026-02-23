@@ -29,6 +29,9 @@ docs = [
 [project.scripts]
 argus-cv = "argus.cli:app"
 
+[tool.uv]
+override-dependencies = ["opencv-python-headless>=99.99.99"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

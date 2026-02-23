@@ -13,6 +13,9 @@ resolution-markers = [
     "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
 ]
 
+[manifest]
+overrides = [{ name = "opencv-python-headless", specifier = ">=99.99.99" }]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -24,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "argus-cv"
-version = "1.5.4"
+version = "1.5.5"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
