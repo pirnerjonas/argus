@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-02-23)
+
+### Bug Fixes
+
+- Prevent opencv-python-headless from being installed via uv override
+  ([#54](https://github.com/pirnerjonas/argus/pull/54),
+  [`40f4f30`](https://github.com/pirnerjonas/argus/commit/40f4f30beec8508b3c71a6a93e9259f390556a71))
+
+### Features
+
+- Add COCO RLE segmentation support in view command
+  ([#54](https://github.com/pirnerjonas/argus/pull/54),
+  [`40f4f30`](https://github.com/pirnerjonas/argus/commit/40f4f30beec8508b3c71a6a93e9259f390556a71))
+
+
 ## v1.5.5 (2026-02-13)
 
 ### Bug Fixes
