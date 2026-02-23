@@ -852,6 +852,160 @@ def roboflow_yolo_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def coco_rle_dataset(tmp_path: Path) -> Path:
+    """Create a COCO dataset with RLE segmentation annotations.
+
+    Contains a 100x100 image with one RLE annotation (10x10 block
+    at top-left in column-major order).
+
+    Structure:
+        dataset/
+        ├── annotations/
+        │   └── instances_train.json
+        └── images/
+            └── train/
+                └── img001.jpg
+    """
+    import cv2 as _cv2
+    import numpy as _np
+
+    dataset_path = tmp_path / "coco_rle"
+    dataset_path.mkdir()
+
+    annotations_dir = dataset_path / "annotations"
+    annotations_dir.mkdir()
+
+    # RLE counts: column-major, alternating bg/fg runs
+    # 10x10 block at rows 0-9, cols 0-9 on a 100x100 image
+    # Column-major: first 10 pixels of each of the first 10 columns are fg
+    counts = []
+    for col in range(10):
+        if col == 0:
+            counts.append(0)  # 0 background pixels before first fg
+            counts.append(10)  # 10 foreground pixels
+        else:
+            counts.append(90)  # 90 background pixels (rest of previous col)
+            counts.append(10)  # 10 foreground pixels
+    # Remaining pixels after the last fg run
+    counts.append(100 * 100 - 10 * 100 + 90)  # rest of col 9 + cols 10-99
+
+    coco_data = {
+        "info": {"description": "RLE test dataset"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [0, 0, 10, 10],
+                "segmentation": {
+                    "counts": counts,
+                    "size": [100, 100],
+                },
+                "area": 100,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": [
+            {"id": 1, "name": "object", "supercategory": "thing"},
+        ],
+    }
+
+    (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+    images_dir = dataset_path / "images" / "train"
+    images_dir.mkdir(parents=True)
+    img = _np.random.randint(0, 255, (100, 100, 3), dtype=_np.uint8)
+    _cv2.imwrite(str(images_dir / "img001.jpg"), img)
+
+    return dataset_path
+
+
+@pytest.fixture
+def coco_mixed_rle_polygon_dataset(tmp_path: Path) -> Path:
+    """Create a COCO dataset with both RLE and polygon annotations.
+
+    Contains a 100x100 image with:
+    - One RLE annotation (category 1): 10x10 block top-left
+    - One polygon annotation (category 2): rectangle at rows 50-69, cols 50-69
+
+    Structure:
+        dataset/
+        ├── annotations/
+        │   └── instances_train.json
+        └── images/
+            └── train/
+                └── img001.jpg
+    """
+    import cv2 as _cv2
+    import numpy as _np
+
+    dataset_path = tmp_path / "coco_mixed"
+    dataset_path.mkdir()
+
+    annotations_dir = dataset_path / "annotations"
+    annotations_dir.mkdir()
+
+    # RLE for 10x10 block at top-left (same as coco_rle_dataset)
+    counts = []
+    for col in range(10):
+        if col == 0:
+            counts.append(0)
+            counts.append(10)
+        else:
+            counts.append(90)
+            counts.append(10)
+    counts.append(100 * 100 - 10 * 100 + 90)
+
+    coco_data = {
+        "info": {"description": "Mixed RLE+polygon test dataset"},
+        "licenses": [],
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [0, 0, 10, 10],
+                "segmentation": {
+                    "counts": counts,
+                    "size": [100, 100],
+                },
+                "area": 100,
+                "iscrowd": 0,
+            },
+            {
+                "id": 2,
+                "image_id": 1,
+                "category_id": 2,
+                "bbox": [50, 50, 20, 20],
+                "segmentation": [[50, 50, 70, 50, 70, 70, 50, 70]],
+                "area": 400,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": [
+            {"id": 1, "name": "cat", "supercategory": "animal"},
+            {"id": 2, "name": "dog", "supercategory": "animal"},
+        ],
+    }
+
+    (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+    images_dir = dataset_path / "images" / "train"
+    images_dir.mkdir(parents=True)
+    img = _np.random.randint(0, 255, (100, 100, 3), dtype=_np.uint8)
+    _cv2.imwrite(str(images_dir / "img001.jpg"), img)
+
+    return dataset_path
+
+
+@pytest.fixture
 def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     """Create a mask dataset where image and mask have different dimensions.
 

@@ -4,6 +4,9 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 from argus.core.base import Dataset, DatasetFormat, TaskType
 
 
@@ -24,6 +27,9 @@ class COCODataset(Dataset):
     """
 
     annotation_files: list[Path] = field(default_factory=list)
+    has_rle: bool = False
+    has_cat_zero: bool = False
+    ignore_index: int | None = 0
     format: DatasetFormat = field(default=DatasetFormat.COCO, init=False)
 
     @classmethod
@@ -155,6 +161,15 @@ class COCODataset(Dataset):
             # Detect splits from annotation files
             splits = cls._detect_splits(all_annotation_files)
 
+            # Check for RLE annotations
+            has_rle = cls._has_rle_annotations(data["annotations"])
+
+            # Check if any category uses ID 0
+            cat_ids = {
+                cat["id"] for cat in categories if isinstance(cat, dict) and "id" in cat
+            }
+            has_cat_zero = 0 in cat_ids
+
             return cls(
                 path=path,
                 task=task,
@@ -162,6 +177,8 @@ class COCODataset(Dataset):
                 class_names=class_names,
                 splits=splits,
                 annotation_files=all_annotation_files,
+                has_rle=has_rle,
+                has_cat_zero=has_cat_zero,
             )
 
         except (json.JSONDecodeError, OSError):
@@ -321,6 +338,26 @@ class COCODataset(Dataset):
 
         # Default to detection
         return TaskType.DETECTION
+
+    @staticmethod
+    def _has_rle_annotations(annotations: list) -> bool:
+        """Check if any annotations use RLE segmentation format.
+
+        Samples the first 50 annotations for efficiency.
+
+        Args:
+            annotations: List of annotation dicts.
+
+        Returns:
+            True if any annotation has RLE format segmentation.
+        """
+        for ann in annotations[:50]:
+            if not isinstance(ann, dict):
+                continue
+            seg = ann.get("segmentation")
+            if isinstance(seg, dict) and "counts" in seg and "size" in seg:
+                return True
+        return False
 
     @classmethod
     def _detect_splits(cls, annotation_files: list[Path]) -> list[str]:
@@ -504,3 +541,193 @@ class COCODataset(Dataset):
                 continue
 
         return annotations
+
+    @staticmethod
+    def _decode_rle(rle: dict, height: int, width: int) -> np.ndarray:
+        """Decode COCO RLE to a binary mask.
+
+        Supports both uncompressed RLE (``counts`` as list of ints) and
+        compressed RLE (``counts`` as string using COCO's LEB128-like
+        encoding with differential coding).
+
+        Args:
+            rle: RLE dict with ``counts`` (list[int] or str) and ``size`` keys.
+            height: Image height.
+            width: Image width.
+
+        Returns:
+            Binary mask of shape (height, width), dtype uint8.
+        """
+        counts = rle.get("counts", [])
+
+        if isinstance(counts, str):
+            run_lengths = COCODataset._decode_compressed_counts(counts)
+        elif isinstance(counts, list) and counts:
+            run_lengths = counts
+        else:
+            return np.zeros((height, width), dtype=np.uint8)
+
+        # Build flat column-major binary mask from run-length counts
+        total = height * width
+        flat = np.zeros(total, dtype=np.uint8)
+        pos = 0
+        for i, count in enumerate(run_lengths):
+            if count < 0:
+                count = 0
+            if i % 2 == 1:  # Odd indices are foreground runs
+                end = min(pos + count, total)
+                if end > pos:
+                    flat[pos:end] = 1
+            pos += count
+
+        # Reshape column-major (Fortran order) to (height, width)
+        mask = flat.reshape((height, width), order="F")
+        return mask
+
+    @staticmethod
+    def _decode_compressed_counts(s: str) -> list[int]:
+        """Decode a COCO compressed RLE counts string to run lengths.
+
+        The format uses a LEB128-like encoding with 6-bit characters
+        (ASCII 48–111) and differential coding after the first two values.
+
+        Args:
+            s: Compressed counts string.
+
+        Returns:
+            List of run-length integers.
+        """
+        cnts: list[int] = []
+        p = 0
+        while p < len(s):
+            x = 0
+            k = 0
+            more = True
+            while more and p < len(s):
+                c = ord(s[p]) - 48
+                x |= (c & 0x1F) << (5 * k)
+                more = bool(c & 0x20)
+                p += 1
+                k += 1
+            # Sign extension: if high data bit is set, extend sign
+            if k > 0 and not more and (c & 0x10):
+                x |= -(1 << (5 * k))
+            # Undo differential encoding for indices > 2
+            if len(cnts) > 2:
+                x += cnts[-2]
+            cnts.append(x)
+        return cnts
+
+    def get_class_mapping(self) -> dict[int, str]:
+        """Return class ID to name mapping from annotation files.
+
+        When ``ignore_index`` is ``None`` (i.e. category 0 is used by a
+        real class), all category IDs are shifted by +1 so that 0 is
+        reserved for background in the mask.
+
+        Returns:
+            Dictionary mapping mask class IDs to category names.
+        """
+        offset = 1 if self.has_cat_zero else 0
+        mapping: dict[int, str] = {}
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    continue
+                for cat in data.get("categories", []):
+                    if isinstance(cat, dict) and "id" in cat and "name" in cat:
+                        mapping[cat["id"] + offset] = cat["name"]
+            except (json.JSONDecodeError, OSError):
+                continue
+        return mapping
+
+    def load_mask(self, image_path: Path) -> np.ndarray | None:
+        """Load a combined class-ID mask for the given image.
+
+        Finds all annotations for the image, decodes each segmentation
+        (RLE via ``_decode_rle``, polygon via ``cv2.fillPoly``), and
+        combines them into a single mask where each pixel holds its
+        class ID (background = 0).
+
+        When ``ignore_index`` is ``None`` (category 0 is a real class),
+        all category IDs are shifted by +1 so that 0 stays background.
+
+        Args:
+            image_path: Path to the image file.
+
+        Returns:
+            Mask array of shape (H, W) with class IDs, or None if
+            the image is not found in any annotation file.
+        """
+        file_name = image_path.name
+        found = False
+        offset = 1 if self.has_cat_zero else 0
+
+        for ann_file in self.annotation_files:
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                # Find image entry
+                images = data.get("images", [])
+                image_entry = None
+                for img in images:
+                    if isinstance(img, dict) and img.get("file_name") == file_name:
+                        image_entry = img
+                        break
+
+                if image_entry is None:
+                    continue
+
+                found = True
+                image_id = image_entry.get("id")
+                height = image_entry.get("height", 0)
+                width = image_entry.get("width", 0)
+
+                if height <= 0 or width <= 0:
+                    continue
+
+                # Choose dtype based on max category ID (after offset)
+                categories = data.get("categories", [])
+                max_cat_id = 0
+                for cat in categories:
+                    if isinstance(cat, dict) and "id" in cat:
+                        max_cat_id = max(max_cat_id, cat["id"] + offset)
+                dtype = np.uint16 if max_cat_id > 255 else np.uint8
+
+                mask = np.zeros((height, width), dtype=dtype)
+
+                # Find and decode annotations for this image
+                for ann in data.get("annotations", []):
+                    if not isinstance(ann, dict):
+                        continue
+                    if ann.get("image_id") != image_id:
+                        continue
+
+                    cat_id = ann.get("category_id", 0) + offset
+                    seg = ann.get("segmentation")
+
+                    if isinstance(seg, dict) and "counts" in seg and "size" in seg:
+                        # RLE segmentation
+                        binary = self._decode_rle(seg, height, width)
+                        mask[binary == 1] = cat_id
+
+                    elif isinstance(seg, list) and seg:
+                        # Polygon segmentation (one or more polygons)
+                        for poly in seg:
+                            if isinstance(poly, list) and len(poly) >= 6:
+                                pts = np.array(poly, dtype=np.float32).reshape(-1, 2)
+                                pts = pts.astype(np.int32)
+                                cv2.fillPoly(mask, [pts], int(cat_id))
+
+                return mask
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return None if not found else None
