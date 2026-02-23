@@ -104,6 +104,37 @@ dataset/
 
 Splits are detected from directory names (`train`, `valid`/`val`, `test`).
 
+### COCO RLE segmentation
+
+COCO annotations can encode instance masks using Run-Length Encoding (RLE)
+instead of polygon point lists. Argus detects RLE annotations automatically and
+renders them as pixel-level mask overlays in the viewer.
+
+Both RLE variants are supported:
+
+- **Uncompressed RLE** — `counts` is a list of integers:
+  ```json
+  {
+    "segmentation": {
+      "counts": [0, 5, 10, 3, 82],
+      "size": [100, 100]
+    }
+  }
+  ```
+- **Compressed RLE** — `counts` is a COCO-style LEB128 string:
+  ```json
+  {
+    "segmentation": {
+      "counts": "eNpjYBgFo2AU0AsABEAAEQ==",
+      "size": [100, 100]
+    }
+  }
+  ```
+
+Datasets that mix RLE and polygon annotations in the same file are handled
+correctly. When you run `argus view` on a COCO dataset with RLE annotations,
+Argus opens the mask overlay viewer instead of the bounding-box viewer.
+
 ## Mask (semantic segmentation)
 
 Mask datasets are simple image + mask folders. Argus detects a few common
