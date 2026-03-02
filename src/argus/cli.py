@@ -19,7 +19,7 @@ from rich.table import Table
 
 from argus.core import COCODataset, Dataset, MaskDataset, YOLODataset
 from argus.core.base import DatasetFormat, TaskType
-from argus.core.convert import convert_mask_to_yolo_seg
+from argus.core.convert import convert_mask_to_yolo_seg, convert_yolo_seg_to_coco
 from argus.core.filter import (
     filter_coco_dataset,
     filter_mask_dataset,
@@ -700,7 +700,7 @@ def convert_dataset(
         str,
         typer.Option(
             "--to",
-            help="Target format (currently only 'yolo-seg' is supported).",
+            help="Target format: 'yolo-seg' (from mask) or 'coco' (from yolo-seg).",
         ),
     ] = "yolo-seg",
     epsilon_factor: Annotated[
@@ -725,16 +725,20 @@ def convert_dataset(
 ) -> None:
     """Convert a dataset from one format to another.
 
-    Currently supports converting MaskDataset to YOLO segmentation format.
+    Supports:
+    - MaskDataset → YOLO segmentation (--to yolo-seg)
+    - YOLO segmentation → COCO (--to coco)
 
-    Example:
+    Examples:
         uvx argus-cv convert -i /path/to/masks -o /path/to/output --to yolo-seg
+        uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to coco
     """
     # Validate format
-    if to_format != "yolo-seg":
+    supported_formats = ("yolo-seg", "coco")
+    if to_format not in supported_formats:
         console.print(
             f"[red]Error: Unsupported target format '{to_format}'.[/red]\n"
-            "[yellow]Currently only 'yolo-seg' is supported.[/yellow]"
+            f"[yellow]Supported formats: {', '.join(supported_formats)}[/yellow]"
         )
         raise typer.Exit(1)
 
@@ -745,16 +749,6 @@ def convert_dataset(
         raise typer.Exit(1)
     if not input_path.is_dir():
         console.print(f"[red]Error: Path is not a directory: {input_path}[/red]")
-        raise typer.Exit(1)
-
-    # Detect source dataset - must be MaskDataset for yolo-seg conversion
-    dataset = MaskDataset.detect(input_path)
-    if not dataset:
-        console.print(
-            f"[red]Error: No MaskDataset found at {input_path}[/red]\n"
-            "[yellow]Ensure the path contains images/ + masks/ directories "
-            "(or equivalent patterns like img/+gt/ or leftImg8bit/+gtFine/).[/yellow]"
-        )
         raise typer.Exit(1)
 
     # Resolve output path
@@ -770,7 +764,29 @@ def convert_dataset(
         )
         raise typer.Exit(1)
 
-    # Show conversion info
+    if to_format == "yolo-seg":
+        _convert_mask_to_yolo(input_path, output_path, epsilon_factor, min_area)
+    elif to_format == "coco":
+        _convert_yolo_to_coco(input_path, output_path)
+
+
+def _convert_mask_to_yolo(
+    input_path: Path,
+    output_path: Path,
+    epsilon_factor: float,
+    min_area: float,
+) -> None:
+    """Run mask → YOLO-seg conversion."""
+
+    dataset = MaskDataset.detect(input_path)
+    if not dataset:
+        console.print(
+            f"[red]Error: No MaskDataset found at {input_path}[/red]\n"
+            "[yellow]Ensure the path contains images/ + masks/ directories "
+            "(or equivalent patterns like img/+gt/ or leftImg8bit/+gtFine/).[/yellow]"
+        )
+        raise typer.Exit(1)
+
     console.print("[cyan]Converting MaskDataset to YOLO segmentation format[/cyan]")
     console.print(f"  Source: {input_path}")
     console.print(f"  Output: {output_path}")
@@ -779,7 +795,6 @@ def convert_dataset(
     console.print(f"  Splits: {splits_str}")
     console.print()
 
-    # Run conversion with progress bar
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -804,7 +819,6 @@ def convert_dataset(
             console.print(f"[red]Error during conversion: {exc}[/red]")
             raise typer.Exit(1) from exc
 
-    # Show results
     console.print()
     console.print("[green]Conversion complete![/green]")
     console.print(f"  Images processed: {stats['images']}")
@@ -814,6 +828,72 @@ def convert_dataset(
     if stats["skipped"] > 0:
         skipped = stats["skipped"]
         console.print(f"  [yellow]Skipped: {skipped} (no mask or empty)[/yellow]")
+    if stats["warnings"] > 0:
+        console.print(f"  [yellow]Warnings: {stats['warnings']}[/yellow]")
+
+    console.print(f"\n[cyan]Output dataset: {output_path}[/cyan]")
+
+
+def _convert_yolo_to_coco(input_path: Path, output_path: Path) -> None:
+    """Run YOLO-seg → COCO conversion."""
+    from argus.core.base import TaskType
+
+    yolo_dataset = YOLODataset.detect(input_path)
+    if not yolo_dataset:
+        console.print(
+            f"[red]Error: No YOLO dataset found at {input_path}[/red]\n"
+            "[yellow]Ensure the path contains a data.yaml and images/labels "
+            "directories.[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    if yolo_dataset.task != TaskType.SEGMENTATION:
+        console.print(
+            "[red]Error: YOLO dataset is not a segmentation dataset.[/red]\n"
+            "[yellow]Only YOLO segmentation datasets can be converted to COCO. "
+            "Labels must have polygon coordinates (>5 columns).[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    console.print("[cyan]Converting YOLO segmentation to COCO format[/cyan]")
+    console.print(f"  Source: {input_path}")
+    console.print(f"  Output: {output_path}")
+    console.print(f"  Classes: {yolo_dataset.num_classes}")
+    splits_str = ", ".join(yolo_dataset.splits) if yolo_dataset.splits else "unsplit"
+    console.print(f"  Splits: {splits_str}")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Processing images...", total=None)
+
+        def update_progress(current: int, total: int) -> None:
+            progress.update(task, completed=current, total=total)
+
+        try:
+            stats = convert_yolo_seg_to_coco(
+                dataset=yolo_dataset,
+                output_path=output_path,
+                progress_callback=update_progress,
+            )
+        except Exception as exc:
+            console.print(f"[red]Error during conversion: {exc}[/red]")
+            raise typer.Exit(1) from exc
+
+    console.print()
+    console.print("[green]Conversion complete![/green]")
+    console.print(f"  Images processed: {stats['images']}")
+    console.print(f"  Annotations created: {stats['annotations']}")
+
+    if stats["skipped"] > 0:
+        console.print(
+            f"  [yellow]Skipped: {stats['skipped']} (could not read)[/yellow]"
+        )
     if stats["warnings"] > 0:
         console.print(f"  [yellow]Warnings: {stats['warnings']}[/yellow]")
 
