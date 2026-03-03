@@ -272,6 +272,105 @@ class TestLoadMask:
         assert mask.dtype == np.uint16
         assert (mask == 300).any()
 
+    def test_polygon_with_hole_mask(self, tmp_path: Path) -> None:
+        """Multi-ring polygon segmentation correctly cuts out holes."""
+        import cv2
+
+        dataset_path = tmp_path / "coco_hole"
+        dataset_path.mkdir()
+        annotations_dir = dataset_path / "annotations"
+        annotations_dir.mkdir()
+
+        # Outer ring: 10,10 → 90,90 on a 100x100 image
+        outer = [10, 10, 90, 10, 90, 90, 10, 90]
+        # Inner hole: 30,30 → 70,70
+        hole = [30, 30, 70, 30, 70, 70, 30, 70]
+
+        coco_data = {
+            "images": [
+                {"id": 1, "file_name": "img.jpg", "width": 100, "height": 100},
+            ],
+            "annotations": [
+                {
+                    "id": 1,
+                    "image_id": 1,
+                    "category_id": 1,
+                    "bbox": [10, 10, 80, 80],
+                    "segmentation": [outer, hole],
+                    "area": 4800,
+                    "iscrowd": 0,
+                },
+            ],
+            "categories": [{"id": 1, "name": "donut", "supercategory": ""}],
+        }
+        (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+        images_dir = dataset_path / "images" / "train"
+        images_dir.mkdir(parents=True)
+        img = np.zeros((100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(images_dir / "img.jpg"), img)
+
+        dataset = COCODataset.detect(dataset_path)
+        assert dataset is not None
+
+        mask = dataset.load_mask(images_dir / "img.jpg")
+        assert mask is not None
+
+        # Outer region should be category 1
+        assert mask[15, 15] == 1
+        assert mask[50, 15] == 1
+        # Hole interior should be background (0)
+        assert mask[50, 50] == 0
+        # Outside should be background
+        assert mask[5, 5] == 0
+
+    def test_polygon_with_hole_annotations(self, tmp_path: Path) -> None:
+        """get_annotations_for_image returns hole polygons."""
+        import cv2
+
+        dataset_path = tmp_path / "coco_hole_ann"
+        dataset_path.mkdir()
+        annotations_dir = dataset_path / "annotations"
+        annotations_dir.mkdir()
+
+        outer = [10, 10, 90, 10, 90, 90, 10, 90]
+        hole = [30, 30, 70, 30, 70, 70, 30, 70]
+
+        coco_data = {
+            "images": [
+                {"id": 1, "file_name": "img.jpg", "width": 100, "height": 100},
+            ],
+            "annotations": [
+                {
+                    "id": 1,
+                    "image_id": 1,
+                    "category_id": 1,
+                    "bbox": [10, 10, 80, 80],
+                    "segmentation": [outer, hole],
+                    "area": 4800,
+                    "iscrowd": 0,
+                },
+            ],
+            "categories": [{"id": 1, "name": "donut", "supercategory": ""}],
+        }
+        (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+        images_dir = dataset_path / "images" / "train"
+        images_dir.mkdir(parents=True)
+        img = np.zeros((100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(images_dir / "img.jpg"), img)
+
+        dataset = COCODataset.detect(dataset_path)
+        assert dataset is not None
+
+        anns = dataset.get_annotations_for_image(images_dir / "img.jpg")
+        assert len(anns) == 1
+        assert anns[0]["polygon"] is not None
+        assert len(anns[0]["polygon"]) == 4  # 4 points for outer ring
+        assert "polygon_holes" in anns[0]
+        assert len(anns[0]["polygon_holes"]) == 1  # 1 hole
+        assert len(anns[0]["polygon_holes"][0]) == 4  # 4 points for hole
+
 
 class TestGetClassMapping:
     """Test get_class_mapping returns correct category mapping."""

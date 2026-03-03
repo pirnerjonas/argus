@@ -518,24 +518,32 @@ class COCODataset(Dataset):
                             float(bbox[3]),
                         )
 
-                    # Get segmentation polygon
+                    # Get segmentation polygon(s)
                     polygon = None
+                    polygon_holes: list[list[tuple[float, float]]] = []
                     seg = ann.get("segmentation")
                     if isinstance(seg, list) and seg and isinstance(seg[0], list):
-                        # Polygon format: [[x1, y1, x2, y2, ...]]
-                        coords = seg[0]
-                        polygon = []
-                        for i in range(0, len(coords), 2):
-                            polygon.append((float(coords[i]), float(coords[i + 1])))
+                        # Polygon format: [[x1, y1, ...], [hole_x1, hole_y1, ...]]
+                        for ring_idx, coords in enumerate(seg):
+                            if not isinstance(coords, list) or len(coords) < 6:
+                                continue
+                            ring = []
+                            for i in range(0, len(coords), 2):
+                                ring.append((float(coords[i]), float(coords[i + 1])))
+                            if ring_idx == 0:
+                                polygon = ring
+                            else:
+                                polygon_holes.append(ring)
 
-                    annotations.append(
-                        {
-                            "class_name": class_name,
-                            "class_id": cat_id,
-                            "bbox": bbox_tuple,
-                            "polygon": polygon,
-                        }
-                    )
+                    ann_dict: dict = {
+                        "class_name": class_name,
+                        "class_id": cat_id,
+                        "bbox": bbox_tuple,
+                        "polygon": polygon,
+                    }
+                    if polygon_holes:
+                        ann_dict["polygon_holes"] = polygon_holes
+                    annotations.append(ann_dict)
 
             except (json.JSONDecodeError, OSError):
                 continue
@@ -718,12 +726,16 @@ class COCODataset(Dataset):
                         mask[binary == 1] = cat_id
 
                     elif isinstance(seg, list) and seg:
-                        # Polygon segmentation (one or more polygons)
+                        # Polygon segmentation (one or more rings).
+                        # Pass all rings to a single fillPoly call so the
+                        # even-odd fill rule correctly cuts out holes.
+                        all_pts = []
                         for poly in seg:
                             if isinstance(poly, list) and len(poly) >= 6:
                                 pts = np.array(poly, dtype=np.float32).reshape(-1, 2)
-                                pts = pts.astype(np.int32)
-                                cv2.fillPoly(mask, [pts], int(cat_id))
+                                all_pts.append(pts.astype(np.int32))
+                        if all_pts:
+                            cv2.fillPoly(mask, all_pts, int(cat_id))
 
                 return mask
 

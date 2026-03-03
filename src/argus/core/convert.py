@@ -486,9 +486,11 @@ def convert_yolo_seg_to_coco(
             )
 
             # Find corresponding label file
-            images_dir, labels_dir = dataset.get_split_dirs(
-                split if split else (dataset.splits[0] if dataset.splits else "train")
-            )
+            if split:
+                _, labels_dir = dataset.get_split_dirs(split)
+            else:
+                # Unsplit dataset: labels are directly in labels/
+                labels_dir = dataset.path / "labels"
             label_path = labels_dir / f"{image_path.stem}.txt"
 
             if label_path.exists():

@@ -1796,10 +1796,17 @@ def _draw_annotations(
         # Draw polygon if available (segmentation)
         if polygon:
             pts = np.array(polygon, dtype=np.int32)
-            cv2.polylines(img, [pts], isClosed=True, color=color, thickness=2)
-            # Draw semi-transparent fill
+            # Collect all rings (outer + holes) for correct even-odd fill
+            all_rings = [pts]
+            polygon_holes = ann.get("polygon_holes", [])
+            for hole in polygon_holes:
+                all_rings.append(np.array(hole, dtype=np.int32))
+            # Draw outlines
+            for ring in all_rings:
+                cv2.polylines(img, [ring], isClosed=True, color=color, thickness=2)
+            # Draw semi-transparent fill with holes cut out
             overlay = img.copy()
-            cv2.fillPoly(overlay, [pts], color)
+            cv2.fillPoly(overlay, all_rings, color)
             cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
             # Draw small points at polygon vertices
             for pt in pts:

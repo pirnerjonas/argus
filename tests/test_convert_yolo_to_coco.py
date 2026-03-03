@@ -462,6 +462,58 @@ class TestConvertYoloSegToCocoEmptyLabels:
         assert len(coco["annotations"]) == 1
 
 
+class TestConvertYoloSegToCocoUnsplit:
+    """Tests for unsplit datasets (images/ and labels/ at root, no split dirs)."""
+
+    @pytest.fixture
+    def yolo_seg_unsplit_dataset(self, tmp_path: Path) -> Path:
+        """Create an unsplit YOLO segmentation dataset."""
+        dataset_path = tmp_path / "yolo_unsplit"
+        dataset_path.mkdir()
+
+        yaml_content = {
+            "path": ".",
+            "names": {0: "thing"},
+        }
+        (dataset_path / "data.yaml").write_text(yaml.dump(yaml_content))
+
+        (dataset_path / "images").mkdir()
+        (dataset_path / "labels").mkdir()
+
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(dataset_path / "images" / "img001.jpg"), img)
+        cv2.imwrite(str(dataset_path / "images" / "img002.jpg"), img)
+
+        rect_label = "0 0.1 0.1 0.9 0.1 0.9 0.9 0.1 0.9\n"
+        (dataset_path / "labels" / "img001.txt").write_text(rect_label)
+        (dataset_path / "labels" / "img002.txt").write_text(rect_label)
+
+        return dataset_path
+
+    def test_unsplit_annotations_found(
+        self, yolo_seg_unsplit_dataset: Path, tmp_path: Path
+    ) -> None:
+        dataset = YOLODataset.detect(yolo_seg_unsplit_dataset)
+        assert dataset is not None
+        assert dataset.splits == []
+
+        output = tmp_path / "coco_out"
+        stats = convert_yolo_seg_to_coco(dataset, output)
+
+        assert stats["images"] == 2
+        assert stats["annotations"] == 2
+
+        ann_file = output / "annotations" / "instances_train.json"
+        with open(ann_file) as f:
+            coco = json.load(f)
+
+        assert len(coco["images"]) == 2
+        assert len(coco["annotations"]) == 2
+        for ann in coco["annotations"]:
+            assert ann["category_id"] == 1
+            assert len(ann["segmentation"]) >= 1
+
+
 class TestConvertCliCoco:
     """CLI end-to-end tests for --to coco."""
 
