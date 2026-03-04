@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-03-04)
+
+### Bug Fixes
+
+- Handle unsplit datasets and polygon holes in YOLO-to-COCO conversion and viewer
+  ([#55](https://github.com/pirnerjonas/argus/pull/55),
+  [`1a0e149`](https://github.com/pirnerjonas/argus/commit/1a0e149e71606f0d3d4f5e68a562fd447c317f93))
+
+### Features
+
+- Add YOLO segmentation to COCO format conversion
+  ([#55](https://github.com/pirnerjonas/argus/pull/55),
+  [`1a0e149`](https://github.com/pirnerjonas/argus/commit/1a0e149e71606f0d3d4f5e68a562fd447c317f93))
+
+
 ## v1.6.0 (2026-02-23)
 
 ### Bug Fixes
