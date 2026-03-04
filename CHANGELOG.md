@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.8.1 (2026-03-04)
+
+### Bug Fixes
+
+- Correct filter spinner progress for COCO datasets
+  ([#61](https://github.com/pirnerjonas/argus/pull/61),
+  [`398b074`](https://github.com/pirnerjonas/argus/commit/398b07431d1a989a08318b0e95ecb53fae9785ce))
+
+- **filter**: Correct spinner progress for COCO datasets
+  ([#61](https://github.com/pirnerjonas/argus/pull/61),
+  [`398b074`](https://github.com/pirnerjonas/argus/commit/398b07431d1a989a08318b0e95ecb53fae9785ce))
+
+
 ## v1.8.0 (2026-03-04)
 
 ### Features
