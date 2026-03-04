@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-03-04)
+
+### Features
+
+- **convert**: Add YOLO-seg to Roboflow COCO conversion
+  ([#58](https://github.com/pirnerjonas/argus/pull/58),
+  [`08505ee`](https://github.com/pirnerjonas/argus/commit/08505ee7200afd4155bf427203ddfaf2b6fb978b))
+
+- **split**: Preserve roboflow coco layout on split
+  ([#58](https://github.com/pirnerjonas/argus/pull/58),
+  [`08505ee`](https://github.com/pirnerjonas/argus/commit/08505ee7200afd4155bf427203ddfaf2b6fb978b))
+
+### Refactoring
+
+- **cli**: Share path helpers and simplify view flow
+  ([#56](https://github.com/pirnerjonas/argus/pull/56),
+  [`d531dbc`](https://github.com/pirnerjonas/argus/commit/d531dbcf3a634835625cf7f7d671a3338c840786))
+
+- **cli**: Split monolithic CLI into modules ([#56](https://github.com/pirnerjonas/argus/pull/56),
+  [`d531dbc`](https://github.com/pirnerjonas/argus/commit/d531dbcf3a634835625cf7f7d671a3338c840786))
+
+
 ## v1.7.0 (2026-03-04)
 
 ### Bug Fixes
