@@ -278,9 +278,17 @@ class YOLODataset(Dataset):
                 self.path / actual_dir / "images",
                 self.path / actual_dir / "labels",
             )
+        # Standard layout — also check "valid" alias for "val"
+        actual_split = split
+        if (
+            split == "val"
+            and not (self.path / "images" / "val").is_dir()
+            and (self.path / "images" / "valid").is_dir()
+        ):
+            actual_split = "valid"
         return (
-            self.path / "images" / split,
-            self.path / "labels" / split,
+            self.path / "images" / actual_split,
+            self.path / "labels" / actual_split,
         )
 
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
