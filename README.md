@@ -44,4 +44,10 @@ uvx argus-cv view -d /path/to/dataset --split val
 
 # Split an unsplit dataset into train/val/test
 uvx argus-cv split -d /path/to/dataset -o /path/to/output -r 0.8,0.1,0.1
+
+# Filter dataset to selected classes
+uvx argus-cv filter -d /path/to/dataset -o /path/to/output --classes person,car
+
+# Convert mask -> YOLO segmentation
+uvx argus-cv convert -i /path/to/masks -o /path/to/output --to yolo-seg
 ```

@@ -72,6 +72,7 @@ nav:
       - Visual inspection: guides/viewer.md
       - Splitting datasets: guides/splitting.md
       - Filtering datasets: guides/filtering.md
+      - Converting datasets: guides/conversion.md
   - Reference:
       - CLI reference: reference/cli.md
       - Python API: reference/python-api.md

@@ -9,7 +9,7 @@
     </p>
     <div class="hero__actions">
       <a class="md-button md-button--primary" href="getting-started/quickstart/">Get started</a>
-      <a class="md-button" href="guides/listing/">See the commands</a>
+      <a class="md-button" href="reference/cli/">See the commands</a>
     </div>
   </div>
   <div class="hero__card">
@@ -23,6 +23,9 @@ argus-cv stats -d /data/animals
 
 # Visual inspection
 argus-cv view -d /data/animals --split val
+
+# Convert mask dataset to YOLO segmentation
+argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
 ```
 
   </div>
@@ -66,6 +69,12 @@ argus-cv view -d /data/animals --split val
 
     ```bash
     argus-cv split -d /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
+    ```
+
+=== "Convert formats"
+
+    ```bash
+    argus-cv convert -i /datasets/retail_masks -o /datasets/retail_yolo --to yolo-seg
     ```
 
 ## What Argus expects
