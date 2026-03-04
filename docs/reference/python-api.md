@@ -11,6 +11,8 @@ from argus.core import (
     YOLODataset,
     convert_mask_to_yolo_labels,
     convert_mask_to_yolo_seg,
+    convert_yolo_seg_to_coco,
+    convert_yolo_seg_to_roboflow_coco,
     filter_coco_dataset,
     filter_mask_dataset,
     filter_yolo_dataset,
@@ -71,3 +73,11 @@ from argus.core import (
 ### `convert_mask_to_yolo_seg`
 
 ::: argus.core.convert_mask_to_yolo_seg
+
+### `convert_yolo_seg_to_coco`
+
+::: argus.core.convert_yolo_seg_to_coco
+
+### `convert_yolo_seg_to_roboflow_coco`
+
+::: argus.core.convert_yolo_seg_to_roboflow_coco

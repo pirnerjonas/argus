@@ -19,7 +19,11 @@ from argus.commands._utils import (
     _resolve_output_path,
 )
 from argus.core import MaskDataset, YOLODataset
-from argus.core.convert import convert_mask_to_yolo_seg, convert_yolo_seg_to_coco
+from argus.core.convert import (
+    convert_mask_to_yolo_seg,
+    convert_yolo_seg_to_coco,
+    convert_yolo_seg_to_roboflow_coco,
+)
 
 
 def convert_dataset(
@@ -43,7 +47,11 @@ def convert_dataset(
         str,
         typer.Option(
             "--to",
-            help="Target format: 'yolo-seg' (from mask) or 'coco' (from yolo-seg).",
+            help=(
+                "Target format: 'yolo-seg' (from mask), "
+                "'coco' (from yolo-seg), or "
+                "'roboflow-coco' (from yolo-seg)."
+            ),
         ),
     ] = "yolo-seg",
     epsilon_factor: Annotated[
@@ -71,13 +79,15 @@ def convert_dataset(
     Supports:
     - MaskDataset → YOLO segmentation (--to yolo-seg)
     - YOLO segmentation → COCO (--to coco)
+    - YOLO segmentation → Roboflow COCO (--to roboflow-coco)
 
     Examples:
         uvx argus-cv convert -i /path/to/masks -o /path/to/output --to yolo-seg
         uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to coco
+        uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to roboflow-coco
     """
     # Validate format
-    supported_formats = ("yolo-seg", "coco")
+    supported_formats = ("yolo-seg", "coco", "roboflow-coco")
     if to_format not in supported_formats:
         console.print(
             f"[red]Error: Unsupported target format '{to_format}'.[/red]\n"
@@ -92,7 +102,9 @@ def convert_dataset(
     if to_format == "yolo-seg":
         _convert_mask_to_yolo(input_path, output_path, epsilon_factor, min_area)
     elif to_format == "coco":
-        _convert_yolo_to_coco(input_path, output_path)
+        _convert_yolo_to_coco(input_path, output_path, roboflow_layout=False)
+    elif to_format == "roboflow-coco":
+        _convert_yolo_to_coco(input_path, output_path, roboflow_layout=True)
 
 
 def _convert_mask_to_yolo(
@@ -159,7 +171,9 @@ def _convert_mask_to_yolo(
     console.print(f"\n[cyan]Output dataset: {output_path}[/cyan]")
 
 
-def _convert_yolo_to_coco(input_path: Path, output_path: Path) -> None:
+def _convert_yolo_to_coco(
+    input_path: Path, output_path: Path, roboflow_layout: bool
+) -> None:
     """Run YOLO-seg → COCO conversion."""
     from argus.core.base import TaskType
 
@@ -175,12 +189,13 @@ def _convert_yolo_to_coco(input_path: Path, output_path: Path) -> None:
     if yolo_dataset.task != TaskType.SEGMENTATION:
         console.print(
             "[red]Error: YOLO dataset is not a segmentation dataset.[/red]\n"
-            "[yellow]Only YOLO segmentation datasets can be converted to COCO. "
+            "[yellow]Only YOLO segmentation datasets can be converted to COCO formats. "
             "Labels must have polygon coordinates (>5 columns).[/yellow]"
         )
         raise typer.Exit(1)
 
-    console.print("[cyan]Converting YOLO segmentation to COCO format[/cyan]")
+    target_name = "Roboflow COCO" if roboflow_layout else "COCO"
+    console.print(f"[cyan]Converting YOLO segmentation to {target_name} format[/cyan]")
     console.print(f"  Source: {input_path}")
     console.print(f"  Output: {output_path}")
     console.print(f"  Classes: {yolo_dataset.num_classes}")
@@ -201,11 +216,18 @@ def _convert_yolo_to_coco(input_path: Path, output_path: Path) -> None:
             progress.update(task, completed=current, total=total)
 
         try:
-            stats = convert_yolo_seg_to_coco(
-                dataset=yolo_dataset,
-                output_path=output_path,
-                progress_callback=update_progress,
-            )
+            if roboflow_layout:
+                stats = convert_yolo_seg_to_roboflow_coco(
+                    dataset=yolo_dataset,
+                    output_path=output_path,
+                    progress_callback=update_progress,
+                )
+            else:
+                stats = convert_yolo_seg_to_coco(
+                    dataset=yolo_dataset,
+                    output_path=output_path,
+                    progress_callback=update_progress,
+                )
         except Exception as exc:
             console.print(f"[red]Error during conversion: {exc}[/red]")
             raise typer.Exit(1) from exc

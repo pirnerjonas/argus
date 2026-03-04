@@ -10,6 +10,7 @@ from argus.cli_common import console
 from argus.commands._utils import _resolve_existing_directory
 from argus.core import COCODataset, YOLODataset
 from argus.core.split import (
+    is_coco_roboflow_layout,
     is_coco_unsplit,
     parse_ratio,
     split_coco_dataset,
@@ -108,6 +109,7 @@ def split_dataset(
             console.print("[red]Error: No annotation files found.[/red]")
             raise typer.Exit(1)
         annotation_file = coco_dataset.annotation_files[0]
+        roboflow_layout = is_coco_roboflow_layout(coco_dataset, annotation_file)
 
         with Progress(
             SpinnerColumn(),
@@ -124,6 +126,7 @@ def split_dataset(
                     ratios,
                     True,
                     seed,
+                    roboflow_layout,
                 )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
