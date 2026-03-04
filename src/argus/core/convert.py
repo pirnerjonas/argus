@@ -396,17 +396,19 @@ def _yolo_polygon_to_coco_segmentation(
     return segmentation, bbox, area
 
 
-def convert_yolo_seg_to_coco(
+def _convert_yolo_seg_to_coco_layout(
     dataset: "YOLODataset",  # noqa: F821
     output_path: Path,
     progress_callback: Callable[[int, int], None] | None = None,
+    roboflow_layout: bool = False,
 ) -> dict[str, int]:
-    """Convert a YOLO segmentation dataset to COCO format.
+    """Convert a YOLO segmentation dataset to COCO-compatible JSON outputs.
 
     Args:
         dataset: Source YOLODataset (must be segmentation task).
-        output_path: Output directory for COCO dataset.
+        output_path: Output directory for converted dataset.
         progress_callback: Optional callback(current, total) for progress updates.
+        roboflow_layout: If True, write Roboflow COCO layout.
 
     Returns:
         Dictionary with conversion statistics:
@@ -415,7 +417,6 @@ def convert_yolo_seg_to_coco(
         - "skipped": Images skipped (could not read, etc.)
         - "warnings": Number of warnings
     """
-
     stats = {
         "images": 0,
         "annotations": 0,
@@ -441,16 +442,25 @@ def convert_yolo_seg_to_coco(
 
     current_image = 0
 
-    # Create annotations directory
+    # Standard COCO keeps annotations in a dedicated folder.
     annotations_dir = output_path / "annotations"
-    annotations_dir.mkdir(parents=True, exist_ok=True)
+    if not roboflow_layout:
+        annotations_dir.mkdir(parents=True, exist_ok=True)
 
     for split in splits:
         split_name = split if split else "train"
 
-        # Create output images directory
-        images_out_dir = output_path / "images" / split_name
-        images_out_dir.mkdir(parents=True, exist_ok=True)
+        if roboflow_layout:
+            # Roboflow uses "valid" folder name for validation split.
+            output_split_name = "valid" if split_name == "val" else split_name
+            split_out_dir = output_path / output_split_name
+            split_out_dir.mkdir(parents=True, exist_ok=True)
+            images_out_dir = split_out_dir
+            annotation_file = split_out_dir / "_annotations.coco.json"
+        else:
+            images_out_dir = output_path / "images" / split_name
+            images_out_dir.mkdir(parents=True, exist_ok=True)
+            annotation_file = annotations_dir / f"instances_{split_name}.json"
 
         coco_images: list[dict] = []
         coco_annotations: list[dict] = []
@@ -533,8 +543,48 @@ def convert_yolo_seg_to_coco(
             "categories": categories,
         }
 
-        annotation_file = annotations_dir / f"instances_{split_name}.json"
         with open(annotation_file, "w") as f:
             json.dump(coco_data, f)
 
     return stats
+
+
+def convert_yolo_seg_to_coco(
+    dataset: "YOLODataset",  # noqa: F821
+    output_path: Path,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> dict[str, int]:
+    """Convert a YOLO segmentation dataset to standard COCO layout.
+
+    Output structure:
+        output/
+        ├── annotations/instances_{split}.json
+        └── images/{split}/*.jpg
+    """
+    return _convert_yolo_seg_to_coco_layout(
+        dataset=dataset,
+        output_path=output_path,
+        progress_callback=progress_callback,
+        roboflow_layout=False,
+    )
+
+
+def convert_yolo_seg_to_roboflow_coco(
+    dataset: "YOLODataset",  # noqa: F821
+    output_path: Path,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> dict[str, int]:
+    """Convert a YOLO segmentation dataset to Roboflow COCO layout.
+
+    Output structure:
+        output/
+        ├── train/_annotations.coco.json
+        ├── valid/_annotations.coco.json
+        └── test/_annotations.coco.json
+    """
+    return _convert_yolo_seg_to_coco_layout(
+        dataset=dataset,
+        output_path=output_path,
+        progress_callback=progress_callback,
+        roboflow_layout=True,
+    )

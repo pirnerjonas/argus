@@ -67,8 +67,7 @@ Options:
 
 ## convert
 
-Convert a dataset from one format to another. Currently supports converting
-MaskDataset to YOLO segmentation format.
+Convert a dataset from one format to another.
 
 ```bash
 argus-cv convert --input-path /path/to/masks \
@@ -76,10 +75,22 @@ argus-cv convert --input-path /path/to/masks \
   --to yolo-seg
 ```
 
+```bash
+argus-cv convert --input-path /path/to/yolo-seg \
+  --output-path /path/to/output \
+  --to coco
+```
+
+```bash
+argus-cv convert --input-path /path/to/yolo-seg \
+  --output-path /path/to/output \
+  --to roboflow-coco
+```
+
 Options:
 
 - `--input-path`, `-i`: source dataset path (default: ".")
 - `--output-path`, `-o`: output directory (default: "converted" next to the input path)
-- `--to`: target format (currently only `yolo-seg`)
+- `--to`: target format (`yolo-seg`, `coco`, `roboflow-coco`)
 - `--epsilon-factor`, `-e`: polygon simplification factor (default: 0.005)
 - `--min-area`, `-a`: minimum contour area in pixels (default: 100.0)

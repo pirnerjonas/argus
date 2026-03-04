@@ -14,6 +14,7 @@ from argus.core.convert import (
     _parse_yolo_label_file,
     _yolo_polygon_to_coco_segmentation,
     convert_yolo_seg_to_coco,
+    convert_yolo_seg_to_roboflow_coco,
 )
 from argus.core.yolo import YOLODataset
 
@@ -435,6 +436,67 @@ class TestConvertYoloSegToCocoMultipleSplits:
         assert len(val_coco["images"]) == 1
 
 
+class TestConvertYoloSegToRoboflowCoco:
+    """Tests for Roboflow COCO layout conversion."""
+
+    def test_output_structure(self, yolo_seg_dataset: Path, tmp_path: Path) -> None:
+        dataset = YOLODataset.detect(yolo_seg_dataset)
+        assert dataset is not None
+
+        output = tmp_path / "roboflow_coco_out"
+        stats = convert_yolo_seg_to_roboflow_coco(dataset, output)
+
+        # train + valid split directories with colocated annotations
+        assert (output / "train").is_dir()
+        assert (output / "valid").is_dir()
+        assert (output / "train" / "_annotations.coco.json").exists()
+        assert (output / "valid" / "_annotations.coco.json").exists()
+
+        # Images are copied directly into split dirs in Roboflow format
+        assert len(list((output / "train").glob("*.jpg"))) == 2
+        assert len(list((output / "valid").glob("*.jpg"))) == 1
+
+        # Standard COCO layout directories should not be required here
+        assert not (output / "annotations").exists()
+        assert not (output / "images").exists()
+
+        # Stats should match regular converter
+        assert stats["images"] == 3
+        assert stats["annotations"] == 4
+
+    def test_unsplit_writes_train_folder(self, tmp_path: Path) -> None:
+        dataset_path = tmp_path / "yolo_unsplit_rf"
+        dataset_path.mkdir()
+
+        yaml_content = {
+            "path": ".",
+            "names": {0: "thing"},
+        }
+        (dataset_path / "data.yaml").write_text(yaml.dump(yaml_content))
+
+        (dataset_path / "images").mkdir()
+        (dataset_path / "labels").mkdir()
+
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(dataset_path / "images" / "img001.jpg"), img)
+        cv2.imwrite(str(dataset_path / "images" / "img002.jpg"), img)
+        rect_label = "0 0.1 0.1 0.9 0.1 0.9 0.9 0.1 0.9\n"
+        (dataset_path / "labels" / "img001.txt").write_text(rect_label)
+        (dataset_path / "labels" / "img002.txt").write_text(rect_label)
+
+        dataset = YOLODataset.detect(dataset_path)
+        assert dataset is not None
+        assert dataset.splits == []
+
+        output = tmp_path / "roboflow_coco_out"
+        stats = convert_yolo_seg_to_roboflow_coco(dataset, output)
+
+        assert stats["images"] == 2
+        assert stats["annotations"] == 2
+        assert (output / "train" / "_annotations.coco.json").exists()
+        assert len(list((output / "train").glob("*.jpg"))) == 2
+
+
 class TestConvertYoloSegToCocoEmptyLabels:
     """Tests for images with no annotations."""
 
@@ -592,3 +654,31 @@ class TestConvertCliCoco:
 
         assert result.exit_code == 1
         assert "Unsupported target format" in result.stdout
+
+
+class TestConvertCliRoboflowCoco:
+    """CLI end-to-end tests for --to roboflow-coco."""
+
+    def test_convert_to_roboflow_coco_basic(
+        self, yolo_seg_dataset: Path, tmp_path: Path
+    ) -> None:
+        output = tmp_path / "rf_coco_out"
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "-i",
+                str(yolo_seg_dataset),
+                "-o",
+                str(output),
+                "--to",
+                "roboflow-coco",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Conversion complete" in result.stdout
+        assert "Images processed" in result.stdout
+        assert "Annotations created" in result.stdout
+        assert (output / "train" / "_annotations.coco.json").exists()
+        assert (output / "valid" / "_annotations.coco.json").exists()
