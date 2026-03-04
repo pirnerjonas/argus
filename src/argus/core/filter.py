@@ -448,9 +448,10 @@ def filter_coco_dataset(
         split = COCODataset._get_split_from_filename(
             ann_file.stem, ann_file.parent.name
         )
+        split_dir_name = dataset.get_split_dir_name(split)
 
-        # Check if this is Roboflow format (annotation in split directory)
-        is_roboflow = ann_file.parent.name.lower() in ("train", "valid", "val", "test")
+        # Keep the source dataset's COCO layout in the filtered output.
+        is_roboflow = dataset.is_roboflow_layout
 
         # Create output annotation
         new_data = data.copy()
@@ -461,7 +462,7 @@ def filter_coco_dataset(
         # Write annotation file
         if is_roboflow:
             # Roboflow format: annotations in split directories
-            out_ann_dir = output_path / split
+            out_ann_dir = output_path / split_dir_name
             out_ann_dir.mkdir(parents=True, exist_ok=True)
             out_ann_file = out_ann_dir / ann_file.name
         else:
@@ -489,7 +490,7 @@ def filter_coco_dataset(
             possible_paths = [
                 dataset.path / "images" / split / file_name,
                 dataset.path / "images" / file_name,
-                dataset.path / split / file_name,
+                dataset.path / split_dir_name / file_name,
                 dataset.path / file_name,
                 ann_file.parent / file_name,  # Roboflow format
             ]
@@ -505,7 +506,7 @@ def filter_coco_dataset(
 
             # Determine output directory
             if is_roboflow:
-                out_img_dir = output_path / split
+                out_img_dir = output_path / split_dir_name
             else:
                 out_img_dir = output_path / "images" / split
             out_img_dir.mkdir(parents=True, exist_ok=True)
