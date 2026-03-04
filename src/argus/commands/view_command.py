@@ -7,11 +7,52 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from argus.cli_common import console
+from argus.commands._utils import _resolve_existing_directory
 from argus.core import COCODataset, MaskDataset
 from argus.core.base import DatasetFormat, TaskType
 from argus.discovery import _detect_dataset
 from argus.rendering import _generate_class_colors
 from argus.viewers import _ClassificationGridViewer, _ImageViewer, _MaskViewer
+
+
+def _run_mask_viewer(
+    dataset: MaskDataset | COCODataset,
+    dataset_path: Path,
+    split: str | None,
+    class_colors: dict[str, tuple[int, int, int]],
+    opacity: float,
+) -> None:
+    """Load images and run the mask overlay viewer."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        progress.add_task("Loading images...", total=None)
+        image_paths = dataset.get_image_paths(split)
+
+    if not image_paths:
+        console.print("[yellow]No images found in the dataset.[/yellow]")
+        return
+
+    console.print(
+        f"[green]Found {len(image_paths)} images. "
+        f"Opening mask viewer...[/green]\n"
+        "[dim]Controls: \u2190 / \u2192 or P / N to navigate, "
+        "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle overlay, "
+        "Q / ESC to quit[/dim]"
+    )
+
+    viewer = _MaskViewer(
+        image_paths=image_paths,
+        dataset=dataset,
+        class_colors=class_colors,
+        window_name=f"Argus Mask Viewer - {dataset_path.name}",
+        opacity=opacity,
+    )
+    viewer.run()
+    console.print("[green]Viewer closed.[/green]")
 
 
 def view(
@@ -66,14 +107,7 @@ def view(
         - T: Toggle annotations (detection/segmentation only)
         - Q / ESC: Quit viewer
     """
-    # Resolve path and validate
-    dataset_path = dataset_path.resolve()
-    if not dataset_path.exists():
-        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
-        raise typer.Exit(1)
-    if not dataset_path.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
-        raise typer.Exit(1)
+    dataset_path = _resolve_existing_directory(dataset_path)
 
     # Detect dataset
     dataset = _detect_dataset(dataset_path)
@@ -100,70 +134,12 @@ def view(
     # Handle mask datasets with overlay viewer
     if dataset.format == DatasetFormat.MASK:
         assert isinstance(dataset, MaskDataset)
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=True,
-        ) as progress:
-            progress.add_task("Loading images...", total=None)
-            image_paths = dataset.get_image_paths(split)
-
-        if not image_paths:
-            console.print("[yellow]No images found in the dataset.[/yellow]")
-            return
-
-        console.print(
-            f"[green]Found {len(image_paths)} images. "
-            f"Opening mask viewer...[/green]\n"
-            "[dim]Controls: \u2190 / \u2192 or P / N to navigate, "
-            "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle overlay, "
-            "Q / ESC to quit[/dim]"
-        )
-
-        viewer = _MaskViewer(
-            image_paths=image_paths,
-            dataset=dataset,
-            class_colors=class_colors,
-            window_name=f"Argus Mask Viewer - {dataset_path.name}",
-            opacity=opacity,
-        )
-        viewer.run()
-        console.print("[green]Viewer closed.[/green]")
+        _run_mask_viewer(dataset, dataset_path, split, class_colors, opacity)
         return
 
     # Handle COCO RLE datasets with mask overlay viewer
     if isinstance(dataset, COCODataset) and dataset.has_rle:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=True,
-        ) as progress:
-            progress.add_task("Loading images...", total=None)
-            image_paths = dataset.get_image_paths(split)
-
-        if not image_paths:
-            console.print("[yellow]No images found in the dataset.[/yellow]")
-            return
-
-        console.print(
-            f"[green]Found {len(image_paths)} images. "
-            f"Opening mask viewer...[/green]\n"
-            "[dim]Controls: \u2190 / \u2192 or P / N to navigate, "
-            "Mouse wheel to zoom, Drag to pan, R to reset, T to toggle overlay, "
-            "Q / ESC to quit[/dim]"
-        )
-
-        viewer = _MaskViewer(
-            image_paths=image_paths,
-            dataset=dataset,
-            class_colors=class_colors,
-            window_name=f"Argus Mask Viewer - {dataset_path.name}",
-            opacity=opacity,
-        )
-        viewer.run()
-        console.print("[green]Viewer closed.[/green]")
+        _run_mask_viewer(dataset, dataset_path, split, class_colors, opacity)
         return
 
     # Handle classification datasets with grid viewer
@@ -198,7 +174,6 @@ def view(
         viewer = _ClassificationGridViewer(
             images_by_class=images_by_class,
             class_names=dataset.class_names,
-            class_colors=class_colors,
             window_name=f"Argus Classification Viewer - {dataset_path.name}",
             max_classes=max_classes,
         )

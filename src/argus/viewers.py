@@ -226,7 +226,6 @@ class _ClassificationGridViewer:
         self,
         images_by_class: dict[str, list[Path]],
         class_names: list[str],
-        class_colors: dict[str, tuple[int, int, int]],
         window_name: str,
         max_classes: int | None = None,
         tile_size: int = 300,
@@ -240,7 +239,6 @@ class _ClassificationGridViewer:
         self.images_by_class = {
             cls: images_by_class.get(cls, []) for cls in self.class_names
         }
-        self.class_colors = class_colors
         self.window_name = window_name
         self.tile_size = tile_size
 

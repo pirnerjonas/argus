@@ -7,6 +7,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from argus.cli_common import console
+from argus.commands._utils import _resolve_existing_directory
 from argus.core import COCODataset, YOLODataset
 from argus.core.split import (
     is_coco_unsplit,
@@ -51,13 +52,7 @@ def split_dataset(
     ] = 42,
 ) -> None:
     """Split an unsplit dataset into train/val/test."""
-    dataset_path = dataset_path.resolve()
-    if not dataset_path.exists():
-        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
-        raise typer.Exit(1)
-    if not dataset_path.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
-        raise typer.Exit(1)
+    dataset_path = _resolve_existing_directory(dataset_path)
 
     dataset = _detect_dataset(dataset_path)
     if not dataset:

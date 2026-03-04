@@ -8,6 +8,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from argus.cli_common import console
+from argus.commands._utils import _resolve_existing_directory
 from argus.core import MaskDataset
 from argus.core.base import DatasetFormat
 from argus.discovery import _detect_dataset
@@ -29,14 +30,7 @@ def stats(
     The path should point to a dataset root containing data.yaml (YOLO)
     or an annotations/ folder (COCO).
     """
-    # Resolve path and validate
-    dataset_path = dataset_path.resolve()
-    if not dataset_path.exists():
-        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
-        raise typer.Exit(1)
-    if not dataset_path.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
-        raise typer.Exit(1)
+    dataset_path = _resolve_existing_directory(dataset_path)
 
     # Detect dataset
     dataset = _detect_dataset(dataset_path)
@@ -120,14 +114,10 @@ def stats(
 
     # Build image stats line
     image_parts = []
-    total_images = 0
-    total_background = 0
     for split in all_splits:
         if split in image_counts:
             img_total = image_counts[split]["total"]
             img_bg = image_counts[split]["background"]
-            total_images += img_total
-            total_background += img_bg
             if img_bg > 0:
                 image_parts.append(f"{split}: {img_total} ({img_bg} background)")
             else:

@@ -13,6 +13,11 @@ from rich.progress import (
 )
 
 from argus.cli_common import console
+from argus.commands._utils import (
+    _ensure_output_directory_empty,
+    _resolve_existing_directory,
+    _resolve_output_path,
+)
 from argus.core import MaskDataset, YOLODataset
 from argus.core.convert import convert_mask_to_yolo_seg, convert_yolo_seg_to_coco
 
@@ -80,27 +85,9 @@ def convert_dataset(
         )
         raise typer.Exit(1)
 
-    # Resolve and validate input path
-    input_path = input_path.resolve()
-    if not input_path.exists():
-        console.print(f"[red]Error: Path does not exist: {input_path}[/red]")
-        raise typer.Exit(1)
-    if not input_path.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {input_path}[/red]")
-        raise typer.Exit(1)
-
-    # Resolve output path
-    if not output_path.is_absolute():
-        output_path = input_path.parent / output_path
-    output_path = output_path.resolve()
-
-    # Check if output already exists
-    if output_path.exists() and any(output_path.iterdir()):
-        console.print(
-            f"[red]Error: Output directory already exists and is not empty: "
-            f"{output_path}[/red]"
-        )
-        raise typer.Exit(1)
+    input_path = _resolve_existing_directory(input_path)
+    output_path = _resolve_output_path(output_path, input_path.parent)
+    _ensure_output_directory_empty(output_path)
 
     if to_format == "yolo-seg":
         _convert_mask_to_yolo(input_path, output_path, epsilon_factor, min_area)

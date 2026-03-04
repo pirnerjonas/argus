@@ -13,6 +13,11 @@ from rich.progress import (
 )
 
 from argus.cli_common import console
+from argus.commands._utils import (
+    _ensure_output_directory_empty,
+    _resolve_existing_directory,
+    _resolve_output_path,
+)
 from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import DatasetFormat
 from argus.core.filter import (
@@ -73,14 +78,7 @@ def filter_dataset(
         argus-cv filter -d dataset -o output --classes ball,player
         argus-cv filter -d dataset -o output --classes ball --symlinks
     """
-    # Resolve path and validate
-    dataset_path = dataset_path.resolve()
-    if not dataset_path.exists():
-        console.print(f"[red]Error: Path does not exist: {dataset_path}[/red]")
-        raise typer.Exit(1)
-    if not dataset_path.is_dir():
-        console.print(f"[red]Error: Path is not a directory: {dataset_path}[/red]")
-        raise typer.Exit(1)
+    dataset_path = _resolve_existing_directory(dataset_path)
 
     # Parse classes
     if not classes:
@@ -117,18 +115,8 @@ def filter_dataset(
         )
         raise typer.Exit(1)
 
-    # Resolve output path
-    if not output_path.is_absolute():
-        output_path = dataset_path.parent / output_path
-    output_path = output_path.resolve()
-
-    # Check if output already exists
-    if output_path.exists() and any(output_path.iterdir()):
-        console.print(
-            f"[red]Error: Output directory already exists and is not empty: "
-            f"{output_path}[/red]"
-        )
-        raise typer.Exit(1)
+    output_path = _resolve_output_path(output_path, dataset_path.parent)
+    _ensure_output_directory_empty(output_path)
 
     # Show filter info
     console.print(f"[cyan]Filtering {dataset.format.value.upper()} dataset[/cyan]")
