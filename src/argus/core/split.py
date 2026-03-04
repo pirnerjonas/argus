@@ -266,6 +266,7 @@ def split_coco_dataset(
     ratios: tuple[float, float, float],
     stratify: bool,
     seed: int,
+    roboflow_layout: bool = False,
 ) -> dict[str, int]:
     """Split a COCO dataset into train/val/test annotation files and images.
 
@@ -276,6 +277,8 @@ def split_coco_dataset(
         ratios: Train/val/test ratios as fractions summing to 1.
         stratify: If True, use category-aware stratified assignment.
         seed: Random seed for deterministic split assignment.
+        roboflow_layout: If True, write Roboflow COCO layout:
+            {split}/_annotations.coco.json with images in the same split dir.
 
     Returns:
         Mapping of split name (train/val/test) to number of assigned images.
@@ -312,10 +315,11 @@ def split_coco_dataset(
     else:
         assignments = _build_random_split(items, ratios, seed)
 
-    annotations_dir = output_path / "annotations"
-    images_dir = output_path / "images"
-    _ensure_dir(annotations_dir)
-    _ensure_dir(images_dir)
+    if not roboflow_layout:
+        annotations_dir = output_path / "annotations"
+        images_dir = output_path / "images"
+        _ensure_dir(annotations_dir)
+        _ensure_dir(images_dir)
 
     images_by_id = {img["id"]: img for img in images if "id" in img}
 
@@ -337,7 +341,11 @@ def split_coco_dataset(
             source = _find_image_path(dataset.path, file_name)
             if source is None:
                 raise ValueError(f"Image file not found: {file_name}")
-            split_dir = images_dir / split
+            if roboflow_layout:
+                split_dir_name = "valid" if split == "val" else split
+                split_dir = output_path / split_dir_name
+            else:
+                split_dir = images_dir / split
             _ensure_dir(split_dir)
             shutil.copy2(source, split_dir / Path(file_name).name)
 
@@ -348,10 +356,62 @@ def split_coco_dataset(
             "annotations": split_annotations,
             "categories": data.get("categories", []),
         }
-        out_file = annotations_dir / f"instances_{split}.json"
+        if roboflow_layout:
+            split_dir_name = "valid" if split == "val" else split
+            out_file = output_path / split_dir_name / "_annotations.coco.json"
+        else:
+            out_file = annotations_dir / f"instances_{split}.json"
         out_file.write_text(json.dumps(split_data))
 
     return {split: len(items) for split, items in assignments.items()}
+
+
+def is_coco_roboflow_layout(dataset: COCODataset, annotation_file: Path) -> bool:
+    """Heuristically detect Roboflow COCO layout from an annotation file.
+
+    Roboflow COCO stores the annotation JSON in the same directory as images
+    (for example: train/_annotations.coco.json + train/*.jpg).
+
+    Args:
+        dataset: Source COCO dataset.
+        annotation_file: Annotation file used for splitting.
+
+    Returns:
+        True when the source layout appears to be Roboflow-style COCO.
+    """
+    # Standard COCO typically stores JSON under annotations/.
+    if annotation_file.parent.name.lower() == "annotations":
+        return False
+
+    try:
+        data = json.loads(annotation_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    images = data.get("images", [])
+    if not isinstance(images, list):
+        return False
+
+    # Check a sample of image references for co-location with the annotation file.
+    checked = 0
+    colocated = 0
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        file_name = image.get("file_name")
+        if not isinstance(file_name, str) or not file_name:
+            continue
+        checked += 1
+        if (annotation_file.parent / file_name).exists():
+            colocated += 1
+        if checked >= 20:
+            break
+
+    if checked == 0:
+        return False
+
+    # Majority threshold to avoid false positives on mixed structures.
+    return colocated / checked >= 0.5
 
 
 def is_coco_unsplit(annotation_files: Iterable[Path]) -> bool:
