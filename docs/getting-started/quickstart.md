@@ -1,6 +1,6 @@
 # Quickstart
 
-Point Argus at a dataset root. It will detect YOLO or COCO automatically.
+Point Argus at a dataset root. Argus detects YOLO, COCO, and mask layouts automatically.
 
 ## 1. List datasets under a directory
 
@@ -41,3 +41,13 @@ argus-cv split -d /datasets/traffic -o /datasets/traffic_splits -r 0.8,0.1,0.1
 
 This writes the split dataset to the output path and prints counts for each
 split.
+
+## 5. Convert formats (optional)
+
+```bash
+# mask -> YOLO segmentation
+argus-cv convert -i /datasets/traffic_masks -o /datasets/traffic_yolo --to yolo-seg
+
+# YOLO segmentation -> COCO
+argus-cv convert -i /datasets/traffic_yolo -o /datasets/traffic_coco --to coco
+```
