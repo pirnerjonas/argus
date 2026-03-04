@@ -1,7 +1,7 @@
 """Core dataset detection and handling."""
 
 from argus.core.base import Dataset
-from argus.core.coco import COCODataset
+from argus.core.coco import COCODataset, COCOLayout
 from argus.core.convert import (
     ConversionParams,
     Polygon,
@@ -24,6 +24,7 @@ __all__ = [
     "Dataset",
     "YOLODataset",
     "COCODataset",
+    "COCOLayout",
     "MaskDataset",
     "ConfigurationError",
     "split_coco_dataset",

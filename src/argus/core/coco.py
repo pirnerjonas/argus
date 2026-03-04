@@ -2,12 +2,22 @@
 
 import json
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from argus.core.base import Dataset, DatasetFormat, TaskType
+
+_ROBOFLOW_SPLIT_DIRS = {"train", "val", "valid", "test"}
+
+
+class COCOLayout(str, Enum):
+    """Supported COCO filesystem layouts."""
+
+    STANDARD = "standard"
+    ROBOFLOW = "roboflow"
 
 
 @dataclass
@@ -30,7 +40,19 @@ class COCODataset(Dataset):
     has_rle: bool = False
     has_cat_zero: bool = False
     ignore_index: int | None = 0
+    layout: COCOLayout = COCOLayout.STANDARD
     format: DatasetFormat = field(default=DatasetFormat.COCO, init=False)
+
+    @property
+    def is_roboflow_layout(self) -> bool:
+        """Return True when the dataset uses Roboflow COCO layout."""
+        return self.layout == COCOLayout.ROBOFLOW
+
+    def get_split_dir_name(self, split: str) -> str:
+        """Map canonical split names to on-disk split directory names."""
+        if self.is_roboflow_layout and split == "val":
+            return "valid"
+        return split
 
     @classmethod
     def detect(cls, path: Path) -> "COCODataset | None":
@@ -169,6 +191,7 @@ class COCODataset(Dataset):
                 cat["id"] for cat in categories if isinstance(cat, dict) and "id" in cat
             }
             has_cat_zero = 0 in cat_ids
+            layout = cls._detect_layout(all_annotation_files)
 
             return cls(
                 path=path,
@@ -179,10 +202,69 @@ class COCODataset(Dataset):
                 annotation_files=all_annotation_files,
                 has_rle=has_rle,
                 has_cat_zero=has_cat_zero,
+                layout=layout,
             )
 
         except (json.JSONDecodeError, OSError):
             return None
+
+    @classmethod
+    def _detect_layout(cls, annotation_files: list[Path]) -> COCOLayout:
+        """Detect whether annotation files use standard or Roboflow layout."""
+        if not annotation_files:
+            return COCOLayout.STANDARD
+
+        roboflow_votes = 0
+        standard_votes = 0
+
+        for ann_file in annotation_files:
+            if cls._is_roboflow_annotation_layout(ann_file):
+                roboflow_votes += 1
+            else:
+                standard_votes += 1
+
+        return (
+            COCOLayout.ROBOFLOW
+            if roboflow_votes > standard_votes
+            else COCOLayout.STANDARD
+        )
+
+    @classmethod
+    def _is_roboflow_annotation_layout(cls, ann_file: Path) -> bool:
+        """Heuristically detect if one COCO annotation file is Roboflow-style."""
+        if ann_file.parent.name.lower() == "annotations":
+            return False
+
+        try:
+            with open(ann_file, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return False
+
+        images = data.get("images", [])
+        if not isinstance(images, list):
+            return False
+
+        checked = 0
+        colocated = 0
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            file_name = image.get("file_name")
+            if not isinstance(file_name, str) or not file_name:
+                continue
+            checked += 1
+            if (ann_file.parent / file_name).exists():
+                colocated += 1
+            if checked >= 20:
+                break
+
+        if checked == 0:
+            # If JSON sits inside split directories but references no images,
+            # treat as Roboflow-style layout.
+            return ann_file.parent.name.lower() in _ROBOFLOW_SPLIT_DIRS
+
+        return colocated / checked >= 0.5
 
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
         """Get the number of annotation instances per class, per split.

@@ -15,6 +15,7 @@ from argus.core.coco import COCODataset
 from argus.core.yolo import YOLODataset
 
 _SPLITS = ("train", "val", "test")
+_COCO_SPLIT_DIRS = {"train", "val", "valid", "test"}
 
 
 def parse_ratio(ratio: str) -> tuple[float, float, float]:
@@ -266,7 +267,7 @@ def split_coco_dataset(
     ratios: tuple[float, float, float],
     stratify: bool,
     seed: int,
-    roboflow_layout: bool = False,
+    roboflow_layout: bool | None = None,
 ) -> dict[str, int]:
     """Split a COCO dataset into train/val/test annotation files and images.
 
@@ -279,6 +280,7 @@ def split_coco_dataset(
         seed: Random seed for deterministic split assignment.
         roboflow_layout: If True, write Roboflow COCO layout:
             {split}/_annotations.coco.json with images in the same split dir.
+            If None, infer from ``dataset.layout``.
 
     Returns:
         Mapping of split name (train/val/test) to number of assigned images.
@@ -289,6 +291,8 @@ def split_coco_dataset(
     data = json.loads(annotation_file.read_text(encoding="utf-8"))
     images = data.get("images", [])
     annotations = data.get("annotations", [])
+    if roboflow_layout is None:
+        roboflow_layout = dataset.is_roboflow_layout
 
     image_annotations: dict[int, list[dict]] = {img["id"]: [] for img in images}
     labels: dict[str, set[int]] = {}
@@ -367,56 +371,28 @@ def split_coco_dataset(
 
 
 def is_coco_roboflow_layout(dataset: COCODataset, annotation_file: Path) -> bool:
-    """Heuristically detect Roboflow COCO layout from an annotation file.
+    """Return whether the dataset uses Roboflow COCO layout.
 
-    Roboflow COCO stores the annotation JSON in the same directory as images
-    (for example: train/_annotations.coco.json + train/*.jpg).
+    This is a compatibility shim; the authoritative source is
+    ``COCODataset.layout`` detected during dataset discovery.
 
     Args:
         dataset: Source COCO dataset.
-        annotation_file: Annotation file used for splitting.
+        annotation_file: Unused compatibility parameter.
 
     Returns:
         True when the source layout appears to be Roboflow-style COCO.
     """
-    # Standard COCO typically stores JSON under annotations/.
-    if annotation_file.parent.name.lower() == "annotations":
-        return False
-
-    try:
-        data = json.loads(annotation_file.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return False
-
-    images = data.get("images", [])
-    if not isinstance(images, list):
-        return False
-
-    # Check a sample of image references for co-location with the annotation file.
-    checked = 0
-    colocated = 0
-    for image in images:
-        if not isinstance(image, dict):
-            continue
-        file_name = image.get("file_name")
-        if not isinstance(file_name, str) or not file_name:
-            continue
-        checked += 1
-        if (annotation_file.parent / file_name).exists():
-            colocated += 1
-        if checked >= 20:
-            break
-
-    if checked == 0:
-        return False
-
-    # Majority threshold to avoid false positives on mixed structures.
-    return colocated / checked >= 0.5
+    _ = annotation_file
+    return dataset.is_roboflow_layout
 
 
 def is_coco_unsplit(annotation_files: Iterable[Path]) -> bool:
     for ann_file in annotation_files:
         name = ann_file.stem.lower()
+        parent = ann_file.parent.name.lower()
         if any(split in name for split in _SPLITS):
+            return False
+        if parent in _COCO_SPLIT_DIRS:
             return False
     return True

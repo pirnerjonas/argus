@@ -107,6 +107,7 @@ class TestCOCODatasetDetection:
         assert dataset.num_classes == 2
         assert dataset.class_names == ["person", "car"]
         assert "train" in dataset.splits
+        assert dataset.is_roboflow_layout is False
 
     def test_detect_coco_segmentation_dataset(self, coco_segmentation_dataset: Path):
         """Test detection of valid COCO segmentation dataset."""
@@ -144,6 +145,7 @@ class TestCOCODatasetDetection:
         assert dataset.task == TaskType.DETECTION
         assert dataset.num_classes == 2
         assert dataset.class_names == ["person", "car"]
+        assert dataset.is_roboflow_layout is True
 
     def test_roboflow_coco_splits(self, roboflow_coco_dataset: Path):
         """Test that Roboflow COCO splits are detected from directory names."""

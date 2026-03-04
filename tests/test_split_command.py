@@ -9,6 +9,7 @@ from argus.cli import app
 from argus.core import COCODataset, YOLODataset
 from argus.core.split import (
     is_coco_roboflow_layout,
+    is_coco_unsplit,
     parse_ratio,
     split_coco_dataset,
     split_yolo_dataset,
@@ -214,3 +215,11 @@ def test_split_command_roboflow_coco_preserves_layout(tmp_path: Path) -> None:
     assert (output_path / "train" / "_annotations.coco.json").exists()
     assert (output_path / "valid" / "_annotations.coco.json").exists()
     assert (output_path / "test" / "_annotations.coco.json").exists()
+
+
+def test_is_coco_unsplit_rejects_roboflow_split_dataset(
+    roboflow_coco_dataset: Path,
+) -> None:
+    dataset = COCODataset.detect(roboflow_coco_dataset)
+    assert dataset is not None
+    assert is_coco_unsplit(dataset.annotation_files) is False
