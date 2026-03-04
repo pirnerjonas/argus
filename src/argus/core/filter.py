@@ -351,12 +351,22 @@ def filter_coco_dataset(
     output_path.mkdir(parents=True, exist_ok=True)
 
     stats = {"images": 0, "annotations": 0, "skipped": 0}
+    parsed_annotation_files: list[tuple[Path, dict]] = []
+    total_images = 0
 
-    # Process each annotation file
     for ann_file in dataset.annotation_files:
         with open(ann_file, encoding="utf-8") as f:
             data = json.load(f)
 
+        parsed_annotation_files.append((ann_file, data))
+        total_images += sum(
+            1 for img in data.get("images", []) if isinstance(img, dict) and "id" in img
+        )
+
+    current = 0
+
+    # Process each annotation file
+    for ann_file, data in parsed_annotation_files:
         # Build category mappings
         old_categories = data.get("categories", [])
         old_id_to_name: dict[int, str] = {}
@@ -420,6 +430,10 @@ def filter_coco_dataset(
         for img in old_images:
             if not isinstance(img, dict) or "id" not in img:
                 continue
+
+            if progress_callback:
+                progress_callback(current, total_images)
+            current += 1
 
             old_img_id = img["id"]
 
@@ -517,6 +531,9 @@ def filter_coco_dataset(
             else:
                 if not out_img.exists():
                     shutil.copy2(src_path, out_img)
+
+    if progress_callback:
+        progress_callback(total_images, total_images)
 
     return stats
 

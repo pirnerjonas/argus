@@ -364,6 +364,32 @@ def test_filter_coco_single_class(tmp_path: Path) -> None:
     assert data["categories"][0]["id"] == 1  # Remapped to 1
 
 
+def test_filter_coco_progress_callback(tmp_path: Path) -> None:
+    """Test COCO filter reports progress updates."""
+    dataset_path = tmp_path / "coco"
+    _create_coco_dataset(dataset_path)
+
+    dataset = COCODataset.detect(dataset_path)
+    assert dataset is not None
+
+    output_path = tmp_path / "filtered"
+    updates: list[tuple[int, int]] = []
+
+    def callback(current: int, total: int) -> None:
+        updates.append((current, total))
+
+    filter_coco_dataset(
+        dataset,
+        output_path,
+        classes=["ball"],
+        progress_callback=callback,
+    )
+
+    assert updates
+    assert updates[0] == (0, 5)
+    assert updates[-1] == (5, 5)
+
+
 def test_filter_coco_no_background(tmp_path: Path) -> None:
     """Test filtering COCO dataset with --no-background flag."""
     dataset_path = tmp_path / "coco"

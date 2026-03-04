@@ -134,6 +134,7 @@ def filter_dataset(
         BarColumn(),
         TaskProgressColumn(),
         console=console,
+        transient=True,
     ) as progress:
         task = progress.add_task("Filtering dataset...", total=None)
 
