@@ -1006,6 +1006,77 @@ def coco_mixed_rle_polygon_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def coco_roboflow_rle_dataset(tmp_path: Path) -> Path:
+    """Create a Roboflow-style COCO RLE dataset with path prefixes in file_name.
+
+    Roboflow exports ``file_name`` as ``"images/img001.jpg"`` rather than
+    just ``"img001.jpg"``, and places the annotation JSON alongside the
+    ``images/`` directory inside each split folder.
+
+    Structure:
+        dataset/
+        └── train/
+            ├── _annotations.coco.json   (file_name: "images/img001.jpg")
+            └── images/
+                └── img001.jpg
+    """
+    import cv2 as _cv2
+    import numpy as _np
+
+    dataset_path = tmp_path / "coco_roboflow_rle"
+    dataset_path.mkdir()
+
+    train_dir = dataset_path / "train"
+    train_dir.mkdir()
+
+    counts = []
+    for col in range(10):
+        if col == 0:
+            counts.append(0)
+            counts.append(10)
+        else:
+            counts.append(90)
+            counts.append(10)
+    counts.append(100 * 100 - 10 * 100 + 90)
+
+    coco_data = {
+        "info": {"description": "Roboflow RLE test dataset"},
+        "licenses": [],
+        "images": [
+            {
+                "id": 1,
+                "file_name": "images/img001.jpg",
+                "width": 100,
+                "height": 100,
+            },
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [0, 0, 10, 10],
+                "segmentation": {"counts": counts, "size": [100, 100]},
+                "area": 100,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": [
+            {"id": 1, "name": "object", "supercategory": "thing"},
+        ],
+    }
+
+    (train_dir / "_annotations.coco.json").write_text(json.dumps(coco_data))
+
+    images_dir = train_dir / "images"
+    images_dir.mkdir()
+    img = _np.random.randint(0, 255, (100, 100, 3), dtype=_np.uint8)
+    _cv2.imwrite(str(images_dir / "img001.jpg"), img)
+
+    return dataset_path
+
+
+@pytest.fixture
 def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     """Create a mask dataset where image and mask have different dimensions.
 
