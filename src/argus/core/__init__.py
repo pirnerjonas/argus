@@ -9,6 +9,7 @@ from argus.core.convert import (
     convert_mask_to_yolo_seg,
     convert_yolo_seg_to_coco,
     convert_yolo_seg_to_roboflow_coco,
+    convert_yolo_seg_to_roboflow_coco_rle,
     mask_to_polygons,
 )
 from argus.core.filter import (
@@ -39,4 +40,5 @@ __all__ = [
     "convert_mask_to_yolo_seg",
     "convert_yolo_seg_to_coco",
     "convert_yolo_seg_to_roboflow_coco",
+    "convert_yolo_seg_to_roboflow_coco_rle",
 ]

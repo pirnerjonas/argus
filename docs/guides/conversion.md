@@ -7,6 +7,7 @@ Use `argus-cv convert` to move between supported segmentation formats.
 - Mask dataset -> YOLO segmentation (`--to yolo-seg`)
 - YOLO segmentation -> COCO (`--to coco`)
 - YOLO segmentation -> Roboflow COCO (`--to roboflow-coco`)
+- YOLO segmentation -> Roboflow COCO RLE (`--to roboflow-coco-rle`)
 
 ## 1. Mask -> YOLO segmentation
 
@@ -30,6 +31,15 @@ argus-cv convert -i /datasets/road_yolo -o /datasets/road_coco --to coco
 ```bash
 argus-cv convert -i /datasets/road_yolo -o /datasets/road_rf_coco --to roboflow-coco
 ```
+
+## 4. YOLO segmentation -> Roboflow COCO RLE
+
+```bash
+argus-cv convert -i /datasets/road_yolo -o /datasets/road_rf_coco_rle --to roboflow-coco-rle
+```
+
+Use this for objects with holes/exclusion zones (donut topology), where
+polygon-ring interpretation can vary across training libraries.
 
 ## Output behavior
 
