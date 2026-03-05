@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-03-05)
+
+### Features
+
+- **split**: Add split/unsplit operations for all dataset formats
+  ([#65](https://github.com/pirnerjonas/argus/pull/65),
+  [`db3a199`](https://github.com/pirnerjonas/argus/commit/db3a1993055ad63b22b890bd99cb65ff602ca920))
+
+
 ## v1.9.0 (2026-03-05)
 
 ### Features
