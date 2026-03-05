@@ -15,10 +15,27 @@ from argus.core.convert import (
     _yolo_polygon_to_coco_segmentation,
     convert_yolo_seg_to_coco,
     convert_yolo_seg_to_roboflow_coco,
+    convert_yolo_seg_to_roboflow_coco_rle,
 )
 from argus.core.yolo import YOLODataset
 
 runner = CliRunner()
+
+
+def _decode_uncompressed_rle(segmentation: dict) -> np.ndarray:
+    """Decode COCO uncompressed RLE to a binary mask."""
+    height, width = segmentation["size"]
+    counts = segmentation["counts"]
+
+    flat = np.zeros(height * width, dtype=np.uint8)
+    pos = 0
+    for i, count in enumerate(counts):
+        end = min(pos + int(count), flat.size)
+        if i % 2 == 1 and end > pos:
+            flat[pos:end] = 1
+        pos += int(count)
+
+    return flat.reshape((height, width), order="F")
 
 
 # ---------------------------------------------------------------------------
@@ -497,6 +514,69 @@ class TestConvertYoloSegToRoboflowCoco:
         assert len(list((output / "train").glob("*.jpg"))) == 2
 
 
+class TestConvertYoloSegToRoboflowCocoRle:
+    """Tests for Roboflow COCO RLE layout conversion."""
+
+    def test_output_structure(self, yolo_seg_dataset: Path, tmp_path: Path) -> None:
+        dataset = YOLODataset.detect(yolo_seg_dataset)
+        assert dataset is not None
+
+        output = tmp_path / "roboflow_coco_rle_out"
+        stats = convert_yolo_seg_to_roboflow_coco_rle(dataset, output)
+
+        # train + valid split directories with colocated annotations
+        assert (output / "train").is_dir()
+        assert (output / "valid").is_dir()
+        assert (output / "train" / "_annotations.coco.json").exists()
+        assert (output / "valid" / "_annotations.coco.json").exists()
+
+        # Images are copied directly into split dirs in Roboflow format
+        assert len(list((output / "train").glob("*.jpg"))) == 2
+        assert len(list((output / "valid").glob("*.jpg"))) == 1
+
+        # Standard COCO layout directories should not be required here
+        assert not (output / "annotations").exists()
+        assert not (output / "images").exists()
+
+        # Stats should match regular converter
+        assert stats["images"] == 3
+        assert stats["annotations"] == 4
+
+        with open(output / "train" / "_annotations.coco.json") as f:
+            coco = json.load(f)
+        for ann in coco["annotations"]:
+            seg = ann["segmentation"]
+            assert isinstance(seg, dict)
+            assert "size" in seg
+            assert "counts" in seg
+            assert isinstance(seg["counts"], list)
+
+    def test_donut_hole_preserved(
+        self, yolo_seg_donut_dataset: Path, tmp_path: Path
+    ) -> None:
+        dataset = YOLODataset.detect(yolo_seg_donut_dataset)
+        assert dataset is not None
+
+        output = tmp_path / "roboflow_coco_rle_out"
+        stats = convert_yolo_seg_to_roboflow_coco_rle(dataset, output)
+
+        assert stats["images"] == 1
+        assert stats["annotations"] == 1
+
+        with open(output / "train" / "_annotations.coco.json") as f:
+            coco = json.load(f)
+
+        ann = coco["annotations"][0]
+        mask = _decode_uncompressed_rle(ann["segmentation"])
+        contours, hierarchy = cv2.findContours(
+            (mask * 255).astype(np.uint8), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
+        )
+        assert len(contours) > 0
+        assert hierarchy is not None
+        hole_count = sum(1 for h in hierarchy[0] if h[3] != -1)
+        assert hole_count >= 1
+
+
 class TestConvertYoloSegToCocoEmptyLabels:
     """Tests for images with no annotations."""
 
@@ -682,3 +762,37 @@ class TestConvertCliRoboflowCoco:
         assert "Annotations created" in result.stdout
         assert (output / "train" / "_annotations.coco.json").exists()
         assert (output / "valid" / "_annotations.coco.json").exists()
+
+
+class TestConvertCliRoboflowCocoRle:
+    """CLI end-to-end tests for --to roboflow-coco-rle."""
+
+    def test_convert_to_roboflow_coco_rle_basic(
+        self, yolo_seg_dataset: Path, tmp_path: Path
+    ) -> None:
+        output = tmp_path / "rf_coco_rle_out"
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "-i",
+                str(yolo_seg_dataset),
+                "-o",
+                str(output),
+                "--to",
+                "roboflow-coco-rle",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Conversion complete" in result.stdout
+        assert "Images processed" in result.stdout
+        assert "Annotations created" in result.stdout
+
+        ann_file = output / "train" / "_annotations.coco.json"
+        assert ann_file.exists()
+        with open(ann_file) as f:
+            coco = json.load(f)
+
+        assert len(coco["annotations"]) > 0
+        assert isinstance(coco["annotations"][0]["segmentation"], dict)

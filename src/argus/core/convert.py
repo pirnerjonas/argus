@@ -396,11 +396,92 @@ def _yolo_polygon_to_coco_segmentation(
     return segmentation, bbox, area
 
 
+def _binary_mask_to_coco_rle(mask: NDArray[np.uint8]) -> dict[str, list[int]]:
+    """Encode a binary mask to COCO uncompressed RLE.
+
+    Uses COCO's column-major (Fortran-order) flattening and run lengths starting
+    with the background count.
+
+    Args:
+        mask: Binary mask with shape (H, W), foreground as non-zero.
+
+    Returns:
+        RLE dict with ``size`` and ``counts``.
+    """
+    height, width = mask.shape[:2]
+    flat = (mask > 0).astype(np.uint8).reshape(-1, order="F")
+
+    counts: list[int] = []
+    current_value = 0
+    run_length = 0
+    for value in flat:
+        v = int(value)
+        if v == current_value:
+            run_length += 1
+        else:
+            counts.append(run_length)
+            run_length = 1
+            current_value = v
+    counts.append(run_length)
+
+    return {"size": [height, width], "counts": counts}
+
+
+def _yolo_polygon_to_coco_rle(
+    points: list[tuple[float, float]],
+    img_width: int,
+    img_height: int,
+) -> tuple[dict[str, list[int]], list[float], float]:
+    """Convert a YOLO polygon to COCO RLE, preserving donut holes.
+
+    The input polygon may contain bridge-connected donut geometry. We first
+    recover ring structure via ``_yolo_polygon_to_coco_segmentation`` and then
+    rasterize all rings in one ``fillPoly`` call so OpenCV's even-odd filling
+    cuts out holes.
+
+    Args:
+        points: Normalized (x, y) coordinate pairs from YOLO annotation.
+        img_width: Image width in pixels.
+        img_height: Image height in pixels.
+
+    Returns:
+        Tuple of (rle, bbox, area).
+    """
+    segmentation, _, _ = _yolo_polygon_to_coco_segmentation(
+        points, img_width, img_height
+    )
+    mask = np.zeros((img_height, img_width), dtype=np.uint8)
+
+    rings: list[np.ndarray] = []
+    for ring in segmentation:
+        if len(ring) < 6:
+            continue
+        pts = np.array(ring, dtype=np.int32).reshape(-1, 2)
+        if len(pts) >= 3:
+            rings.append(pts)
+
+    if rings:
+        cv2.fillPoly(mask, rings, 1)
+
+    area = float(np.count_nonzero(mask))
+    if area == 0.0:
+        return _binary_mask_to_coco_rle(mask), [0.0, 0.0, 0.0, 0.0], 0.0
+
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    rmin, rmax = np.where(rows)[0][[0, -1]]
+    cmin, cmax = np.where(cols)[0][[0, -1]]
+    bbox = [float(cmin), float(rmin), float(cmax - cmin + 1), float(rmax - rmin + 1)]
+
+    return _binary_mask_to_coco_rle(mask), bbox, area
+
+
 def _convert_yolo_seg_to_coco_layout(
     dataset: "YOLODataset",  # noqa: F821
     output_path: Path,
     progress_callback: Callable[[int, int], None] | None = None,
     roboflow_layout: bool = False,
+    segmentation_format: str = "polygon",
 ) -> dict[str, int]:
     """Convert a YOLO segmentation dataset to COCO-compatible JSON outputs.
 
@@ -409,6 +490,7 @@ def _convert_yolo_seg_to_coco_layout(
         output_path: Output directory for converted dataset.
         progress_callback: Optional callback(current, total) for progress updates.
         roboflow_layout: If True, write Roboflow COCO layout.
+        segmentation_format: ``polygon`` or ``rle`` for COCO ``segmentation``.
 
     Returns:
         Dictionary with conversion statistics:
@@ -423,6 +505,11 @@ def _convert_yolo_seg_to_coco_layout(
         "skipped": 0,
         "warnings": 0,
     }
+    if segmentation_format not in ("polygon", "rle"):
+        raise ValueError(
+            "segmentation_format must be 'polygon' or 'rle', "
+            f"got '{segmentation_format}'."
+        )
 
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -507,11 +594,17 @@ def _convert_yolo_seg_to_coco_layout(
                 annotations_data = _parse_yolo_label_file(label_path)
 
                 for class_id, points in annotations_data:
-                    segmentation, bbox, area = _yolo_polygon_to_coco_segmentation(
-                        points, img_width, img_height
-                    )
+                    if segmentation_format == "rle":
+                        segmentation: list[list[float]] | dict[str, list[int]]
+                        segmentation, bbox, area = _yolo_polygon_to_coco_rle(
+                            points, img_width, img_height
+                        )
+                    else:
+                        segmentation, bbox, area = _yolo_polygon_to_coco_segmentation(
+                            points, img_width, img_height
+                        )
 
-                    if not segmentation:
+                    if area == 0.0:
                         stats["warnings"] += 1
                         continue
 
@@ -566,6 +659,7 @@ def convert_yolo_seg_to_coco(
         output_path=output_path,
         progress_callback=progress_callback,
         roboflow_layout=False,
+        segmentation_format="polygon",
     )
 
 
@@ -587,4 +681,27 @@ def convert_yolo_seg_to_roboflow_coco(
         output_path=output_path,
         progress_callback=progress_callback,
         roboflow_layout=True,
+        segmentation_format="polygon",
+    )
+
+
+def convert_yolo_seg_to_roboflow_coco_rle(
+    dataset: "YOLODataset",  # noqa: F821
+    output_path: Path,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> dict[str, int]:
+    """Convert a YOLO segmentation dataset to Roboflow COCO layout with RLE.
+
+    Output structure:
+        output/
+        ├── train/_annotations.coco.json
+        ├── valid/_annotations.coco.json
+        └── test/_annotations.coco.json
+    """
+    return _convert_yolo_seg_to_coco_layout(
+        dataset=dataset,
+        output_path=output_path,
+        progress_callback=progress_callback,
+        roboflow_layout=True,
+        segmentation_format="rle",
     )

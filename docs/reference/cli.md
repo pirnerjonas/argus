@@ -72,10 +72,11 @@ argus-cv filter -d /datasets/coco -o /datasets/coco_filtered --classes person,ca
 argus-cv convert -i /datasets/masks -o /datasets/yolo_seg --to yolo-seg
 argus-cv convert -i /datasets/yolo_seg -o /datasets/coco --to coco
 argus-cv convert -i /datasets/yolo_seg -o /datasets/rf_coco --to roboflow-coco
+argus-cv convert -i /datasets/yolo_seg -o /datasets/rf_coco_rle --to roboflow-coco-rle
 ```
 
 - `--input-path`, `-i` (default: `.`): source dataset path
 - `--output-path`, `-o` (default: `converted`): output directory
-- `--to` (default: `yolo-seg`): `yolo-seg`, `coco`, or `roboflow-coco`
+- `--to` (default: `yolo-seg`): `yolo-seg`, `coco`, `roboflow-coco`, or `roboflow-coco-rle`
 - `--epsilon-factor`, `-e` (default: `0.005`): polygon simplification for mask -> YOLO
 - `--min-area`, `-a` (default: `100.0`): minimum contour area for mask -> YOLO

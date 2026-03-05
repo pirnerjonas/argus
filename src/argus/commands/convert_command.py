@@ -23,6 +23,7 @@ from argus.core.convert import (
     convert_mask_to_yolo_seg,
     convert_yolo_seg_to_coco,
     convert_yolo_seg_to_roboflow_coco,
+    convert_yolo_seg_to_roboflow_coco_rle,
 )
 
 
@@ -50,7 +51,7 @@ def convert_dataset(
             help=(
                 "Target format: 'yolo-seg' (from mask), "
                 "'coco' (from yolo-seg), or "
-                "'roboflow-coco' (from yolo-seg)."
+                "'roboflow-coco'/'roboflow-coco-rle' (from yolo-seg)."
             ),
         ),
     ] = "yolo-seg",
@@ -80,14 +81,16 @@ def convert_dataset(
     - MaskDataset → YOLO segmentation (--to yolo-seg)
     - YOLO segmentation → COCO (--to coco)
     - YOLO segmentation → Roboflow COCO (--to roboflow-coco)
+    - YOLO segmentation → Roboflow COCO RLE (--to roboflow-coco-rle)
 
     Examples:
         uvx argus-cv convert -i /path/to/masks -o /path/to/output --to yolo-seg
         uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to coco
         uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to roboflow-coco
+        uvx argus-cv convert -i /path/to/yolo -o /path/to/output --to roboflow-coco-rle
     """
     # Validate format
-    supported_formats = ("yolo-seg", "coco", "roboflow-coco")
+    supported_formats = ("yolo-seg", "coco", "roboflow-coco", "roboflow-coco-rle")
     if to_format not in supported_formats:
         console.print(
             f"[red]Error: Unsupported target format '{to_format}'.[/red]\n"
@@ -102,9 +105,26 @@ def convert_dataset(
     if to_format == "yolo-seg":
         _convert_mask_to_yolo(input_path, output_path, epsilon_factor, min_area)
     elif to_format == "coco":
-        _convert_yolo_to_coco(input_path, output_path, roboflow_layout=False)
+        _convert_yolo_to_coco(
+            input_path,
+            output_path,
+            roboflow_layout=False,
+            use_rle=False,
+        )
     elif to_format == "roboflow-coco":
-        _convert_yolo_to_coco(input_path, output_path, roboflow_layout=True)
+        _convert_yolo_to_coco(
+            input_path,
+            output_path,
+            roboflow_layout=True,
+            use_rle=False,
+        )
+    elif to_format == "roboflow-coco-rle":
+        _convert_yolo_to_coco(
+            input_path,
+            output_path,
+            roboflow_layout=True,
+            use_rle=True,
+        )
 
 
 def _convert_mask_to_yolo(
@@ -172,7 +192,10 @@ def _convert_mask_to_yolo(
 
 
 def _convert_yolo_to_coco(
-    input_path: Path, output_path: Path, roboflow_layout: bool
+    input_path: Path,
+    output_path: Path,
+    roboflow_layout: bool,
+    use_rle: bool = False,
 ) -> None:
     """Run YOLO-seg → COCO conversion."""
     from argus.core.base import TaskType
@@ -194,7 +217,12 @@ def _convert_yolo_to_coco(
         )
         raise typer.Exit(1)
 
-    target_name = "Roboflow COCO" if roboflow_layout else "COCO"
+    if roboflow_layout and use_rle:
+        target_name = "Roboflow COCO RLE"
+    elif roboflow_layout:
+        target_name = "Roboflow COCO"
+    else:
+        target_name = "COCO"
     console.print(f"[cyan]Converting YOLO segmentation to {target_name} format[/cyan]")
     console.print(f"  Source: {input_path}")
     console.print(f"  Output: {output_path}")
@@ -216,7 +244,13 @@ def _convert_yolo_to_coco(
             progress.update(task, completed=current, total=total)
 
         try:
-            if roboflow_layout:
+            if roboflow_layout and use_rle:
+                stats = convert_yolo_seg_to_roboflow_coco_rle(
+                    dataset=yolo_dataset,
+                    output_path=output_path,
+                    progress_callback=update_progress,
+                )
+            elif roboflow_layout:
                 stats = convert_yolo_seg_to_roboflow_coco(
                     dataset=yolo_dataset,
                     output_path=output_path,
