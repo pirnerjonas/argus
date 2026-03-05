@@ -1,6 +1,7 @@
-# Splitting datasets
+# Split and unsplit datasets
 
-Use `argus-cv split` to create train/val/test splits from an unsplit dataset.
+Use `argus-cv split` to create train/val/test splits from an unsplit dataset,
+and `argus-cv unsplit` to merge split datasets back into a flat layout.
 
 ## Basic split
 
@@ -23,6 +24,25 @@ Ratios can sum to 1.0 or 100.
 ```bash
 argus-cv split -d /datasets/animals -o /datasets/animals_splits --seed 7
 ```
+
+## Merge back to unsplit
+
+```bash
+argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit
+```
+
+If your split directories contain duplicate filenames, choose a collision
+strategy:
+
+```bash
+argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
+```
+
+`--collision-policy` options:
+
+- `error` (default): fail on collisions
+- `prefix-split`: prefix duplicates with split name
+- `hash`: suffix duplicates with a deterministic short hash
 
 ## Output layout
 
@@ -55,7 +75,22 @@ output/
     └── test/
 ```
 
+Mask splits are written like this:
+
+```text
+output/
+├── images/
+│   ├── train/
+│   ├── val/
+│   └── test/
+└── masks/
+    ├── train/
+    ├── val/
+    └── test/
+```
+
 ## Common errors
 
 - "Dataset already has splits": Argus only splits datasets that are unsplit.
+- "Dataset is already unsplit": Argus only unsplits datasets that already have splits.
 - "No images found": make sure `images/` exists and matches labels.

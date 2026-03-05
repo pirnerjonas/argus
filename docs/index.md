@@ -4,8 +4,8 @@
     <h1>Vision AI dataset work, without the friction.</h1>
     <p>
       Argus is a focused CLI for YOLO, COCO, and semantic mask datasets. List
-      datasets, inspect class balance, view annotations, and split cleanly for
-      training.
+      datasets, inspect class balance, view annotations, and move between split
+      and unsplit layouts cleanly for training.
     </p>
     <div class="hero__actions">
       <a class="md-button md-button--primary" href="getting-started/quickstart/">Get started</a>
@@ -69,6 +69,12 @@ argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
 
     ```bash
     argus-cv split -d /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
+    ```
+
+=== "Merge splits"
+
+    ```bash
+    argus-cv unsplit -d /datasets/retail_splits -o /datasets/retail_unsplit
     ```
 
 === "Convert formats"

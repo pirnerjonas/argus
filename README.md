@@ -19,7 +19,7 @@ uvx argus-cv
 - Detects YOLO, COCO, and folder-based semantic mask datasets.
 - Reports per-class stats (pixel coverage for mask datasets).
 - Interactive viewer with bounding boxes, polygons, or mask overlays.
-- Split unsplit YOLO/COCO datasets into train/val/test.
+- Split and unsplit YOLO/COCO/mask datasets.
 
 ## Usage
 
@@ -44,6 +44,9 @@ uvx argus-cv view -d /path/to/dataset --split val
 
 # Split an unsplit dataset into train/val/test
 uvx argus-cv split -d /path/to/dataset -o /path/to/output -r 0.8,0.1,0.1
+
+# Merge a split dataset back into unsplit layout
+uvx argus-cv unsplit -d /path/to/split_dataset -o /path/to/output
 
 # Filter dataset to selected classes
 uvx argus-cv filter -d /path/to/dataset -o /path/to/output --classes person,car

@@ -1,7 +1,7 @@
-"""Split command implementation."""
+"""Unsplit command implementation."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -11,21 +11,21 @@ from argus.commands._utils import _resolve_existing_directory
 from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import Partitioning
 from argus.core.split import (
-    parse_ratio,
-    split_coco_dataset,
-    split_mask_dataset,
-    split_yolo_dataset,
+    CollisionPolicy,
+    unsplit_coco_dataset,
+    unsplit_mask_dataset,
+    unsplit_yolo_dataset,
 )
 from argus.discovery import _detect_dataset
 
 
-def split_dataset(
+def unsplit_dataset(
     dataset_path: Annotated[
         Path,
         typer.Option(
             "--dataset-path",
             "-d",
-            help="Path to the dataset root directory.",
+            help="Path to the split dataset root directory.",
         ),
     ] = Path("."),
     output_path: Annotated[
@@ -33,26 +33,19 @@ def split_dataset(
         typer.Option(
             "--output-path",
             "-o",
-            help="Directory to write the split dataset.",
+            help="Directory to write the unsplit dataset.",
         ),
-    ] = Path("splits"),
-    ratio: Annotated[
+    ] = Path("unsplit"),
+    collision_policy: Annotated[
         str,
         typer.Option(
-            "--ratio",
-            "-r",
-            help="Train/val/test ratio (e.g. 0.8,0.1,0.1).",
+            "--collision-policy",
+            help="How to handle duplicate filenames: error, prefix-split, or hash.",
+            case_sensitive=False,
         ),
-    ] = "0.8,0.1,0.1",
-    seed: Annotated[
-        int,
-        typer.Option(
-            "--seed",
-            help="Random seed for deterministic splitting.",
-        ),
-    ] = 42,
+    ] = "error",
 ) -> None:
-    """Split an unsplit dataset into train/val/test."""
+    """Merge a split dataset into an unsplit dataset."""
     dataset_path = _resolve_existing_directory(dataset_path)
 
     dataset = _detect_dataset(dataset_path)
@@ -65,22 +58,25 @@ def split_dataset(
         )
         raise typer.Exit(1)
 
-    try:
-        ratios = parse_ratio(ratio)
-    except ValueError as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(1) from exc
+    if dataset.partitioning == Partitioning.UNSPLIT:
+        console.print(
+            "[red]Error: Dataset is already unsplit. "
+            "Use a split dataset to run unsplit.[/red]"
+        )
+        raise typer.Exit(1)
+
+    collision_policy = collision_policy.lower()
+    if collision_policy not in ("error", "prefix-split", "hash"):
+        console.print(
+            "[red]Error: Invalid collision policy.[/red]\n"
+            "[yellow]Expected one of: error, prefix-split, hash.[/yellow]"
+        )
+        raise typer.Exit(1)
+    typed_policy = cast(CollisionPolicy, collision_policy)
 
     if not output_path.is_absolute():
         output_path = dataset_path / output_path
     output_path = output_path.resolve()
-
-    if dataset.partitioning == Partitioning.SPLIT:
-        console.print(
-            "[red]Error: Dataset already has splits. "
-            "Use an unsplit dataset to run split.[/red]"
-        )
-        raise typer.Exit(1)
 
     if isinstance(dataset, YOLODataset):
         with Progress(
@@ -89,35 +85,29 @@ def split_dataset(
             console=console,
             transient=True,
         ) as progress:
-            progress.add_task("Creating YOLO splits...", total=None)
+            progress.add_task("Merging YOLO splits...", total=None)
             try:
-                counts = split_yolo_dataset(dataset, output_path, ratios, True, seed)
+                stats = unsplit_yolo_dataset(
+                    dataset=dataset,
+                    output_path=output_path,
+                    collision_policy=typed_policy,
+                )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc
     elif isinstance(dataset, COCODataset):
-        coco_dataset = dataset
-        if not coco_dataset.annotation_files:
-            console.print("[red]Error: No annotation files found.[/red]")
-            raise typer.Exit(1)
-        annotation_file = coco_dataset.annotation_files[0]
-
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
             transient=True,
         ) as progress:
-            progress.add_task("Creating COCO splits...", total=None)
+            progress.add_task("Merging COCO splits...", total=None)
             try:
-                counts = split_coco_dataset(
-                    coco_dataset,
-                    annotation_file,
-                    output_path,
-                    ratios,
-                    True,
-                    seed,
-                    coco_dataset.is_roboflow_layout,
+                stats = unsplit_coco_dataset(
+                    dataset=dataset,
+                    output_path=output_path,
+                    collision_policy=typed_policy,
                 )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
@@ -129,17 +119,18 @@ def split_dataset(
             console=console,
             transient=True,
         ) as progress:
-            progress.add_task("Creating mask dataset splits...", total=None)
+            progress.add_task("Merging mask dataset splits...", total=None)
             try:
-                counts = split_mask_dataset(dataset, output_path, ratios, True, seed)
+                stats = unsplit_mask_dataset(
+                    dataset=dataset,
+                    output_path=output_path,
+                    collision_policy=typed_policy,
+                )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc
     else:
-        console.print("[red]Error: Unsupported dataset type for split command.[/red]")
+        console.print("[red]Error: Unsupported dataset type for unsplit command.[/red]")
         raise typer.Exit(1)
 
-    console.print(
-        "[green]Split complete.[/green] "
-        f"Train: {counts['train']}, Val: {counts['val']}, Test: {counts['test']}."
-    )
+    console.print(f"[green]Unsplit complete.[/green] Total images: {stats['total']}.")

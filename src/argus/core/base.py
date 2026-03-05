@@ -22,6 +22,13 @@ class TaskType(str, Enum):
     CLASSIFICATION = "classification"
 
 
+class Partitioning(str, Enum):
+    """Dataset partitioning state."""
+
+    SPLIT = "split"
+    UNSPLIT = "unsplit"
+
+
 @dataclass
 class Dataset(ABC):
     """Base class for all dataset formats.
@@ -41,6 +48,11 @@ class Dataset(ABC):
     num_classes: int = 0
     class_names: list[str] = field(default_factory=list)
     splits: list[str] = field(default_factory=list)
+
+    @property
+    def partitioning(self) -> Partitioning:
+        """Return whether dataset is split or unsplit."""
+        return Partitioning.SPLIT if self.splits else Partitioning.UNSPLIT
 
     @classmethod
     @abstractmethod
@@ -114,6 +126,7 @@ class Dataset(ABC):
             "format": self.format.value,
             "task": self.task.value,
             "classes": self.num_classes,
+            "partitioning": self.partitioning.value,
             "splits": ", ".join(self.splits) if self.splits else "unsplit",
         }
 

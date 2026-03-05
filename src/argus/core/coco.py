@@ -374,7 +374,7 @@ class COCODataset(Dataset):
             parent_dir: Optional parent directory name (for Roboflow COCO format).
 
         Returns:
-            Split name (train, val, test) or 'train' as default.
+            Split name (train, val, test) or 'unsplit' when no split is encoded.
         """
         name_lower = filename.lower()
         if "train" in name_lower:
@@ -394,7 +394,7 @@ class COCODataset(Dataset):
             elif parent_lower == "test":
                 return "test"
 
-        return "train"
+        return "unsplit"
 
     @classmethod
     def _determine_task_type(cls, annotations: list) -> TaskType:
@@ -471,10 +471,6 @@ class COCODataset(Dataset):
                 splits.append("val")
             elif parent_lower == "test" and "test" not in splits:
                 splits.append("test")
-
-        # If no splits detected from filenames, default to train
-        if not splits:
-            splits.append("train")
 
         return splits
 

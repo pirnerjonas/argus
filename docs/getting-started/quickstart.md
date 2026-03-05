@@ -42,7 +42,13 @@ argus-cv split -d /datasets/traffic -o /datasets/traffic_splits -r 0.8,0.1,0.1
 This writes the split dataset to the output path and prints counts for each
 split.
 
-## 5. Convert formats (optional)
+## 5. Merge split dataset back to unsplit (optional)
+
+```bash
+argus-cv unsplit -d /datasets/traffic_splits -o /datasets/traffic_unsplit
+```
+
+## 6. Convert formats (optional)
 
 ```bash
 # mask -> YOLO segmentation
