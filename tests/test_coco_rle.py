@@ -372,11 +372,13 @@ class TestLoadMask:
         assert len(anns[0]["polygon_holes"][0]) == 4  # 4 points for hole
 
 
-class TestRoboflowPathPrefix:
-    """Test matching when file_name contains a path prefix (e.g. 'images/img.jpg')."""
+class TestRelativePathFileNames:
+    """Test matching when file_name contains a relative path (e.g. 'images/img.jpg')."""
 
-    def test_load_mask_with_path_prefix(self, coco_roboflow_rle_dataset: Path) -> None:
-        dataset = COCODataset.detect(coco_roboflow_rle_dataset)
+    def test_load_mask_with_path_prefix(
+        self, coco_relative_path_rle_dataset: Path
+    ) -> None:
+        dataset = COCODataset.detect(coco_relative_path_rle_dataset)
         assert dataset is not None
         image_paths = dataset.get_image_paths()
         assert len(image_paths) == 1
@@ -387,9 +389,9 @@ class TestRoboflowPathPrefix:
         assert (mask[:10, :10] == 1).all()
 
     def test_get_annotations_with_path_prefix(
-        self, coco_roboflow_rle_dataset: Path
+        self, coco_relative_path_rle_dataset: Path
     ) -> None:
-        dataset = COCODataset.detect(coco_roboflow_rle_dataset)
+        dataset = COCODataset.detect(coco_relative_path_rle_dataset)
         assert dataset is not None
         image_paths = dataset.get_image_paths()
 
