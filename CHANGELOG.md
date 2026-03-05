@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.3 (2026-03-05)
+
+### Bug Fixes
+
+- **view**: Match COCO images when file_name contains a relative path
+  ([#63](https://github.com/pirnerjonas/argus/pull/63),
+  [`89bc24b`](https://github.com/pirnerjonas/argus/commit/89bc24b7a543adcee37410c195fb331ba17a1eae))
+
+
 ## v1.8.2 (2026-03-05)
 
 ### Bug Fixes
