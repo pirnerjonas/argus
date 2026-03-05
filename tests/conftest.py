@@ -1006,12 +1006,13 @@ def coco_mixed_rle_polygon_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def coco_roboflow_rle_dataset(tmp_path: Path) -> Path:
-    """Create a Roboflow-style COCO RLE dataset with path prefixes in file_name.
+def coco_relative_path_rle_dataset(tmp_path: Path) -> Path:
+    """Create a COCO RLE dataset where file_name contains a relative path prefix.
 
-    Roboflow exports ``file_name`` as ``"images/img001.jpg"`` rather than
-    just ``"img001.jpg"``, and places the annotation JSON alongside the
-    ``images/`` directory inside each split folder.
+    The COCO spec allows ``file_name`` to be a relative path like
+    ``"images/img001.jpg"`` rather than a bare filename. This fixture
+    verifies that ``load_mask`` and ``get_annotations_for_image`` still
+    match correctly.
 
     Structure:
         dataset/
