@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-03-05)
+
+### Features
+
+- **convert**: Add roboflow-coco-rle conversion target
+  ([#64](https://github.com/pirnerjonas/argus/pull/64),
+  [`19d2bcf`](https://github.com/pirnerjonas/argus/commit/19d2bcf9018ca8b72a5d0124c70448ef7c12c16d))
+
+
 ## v1.8.3 (2026-03-05)
 
 ### Bug Fixes
