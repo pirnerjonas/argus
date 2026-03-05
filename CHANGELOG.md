@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.2 (2026-03-05)
+
+### Bug Fixes
+
+- **view**: Match COCO images with path prefixes in file_name
+  ([#62](https://github.com/pirnerjonas/argus/pull/62),
+  [`c2dba5a`](https://github.com/pirnerjonas/argus/commit/c2dba5a7c85d1243d3ac4435365682685476c56d))
+
+
 ## v1.8.1 (2026-03-04)
 
 ### Bug Fixes
