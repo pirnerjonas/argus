@@ -372,6 +372,32 @@ class TestLoadMask:
         assert len(anns[0]["polygon_holes"][0]) == 4  # 4 points for hole
 
 
+class TestRoboflowPathPrefix:
+    """Test matching when file_name contains a path prefix (e.g. 'images/img.jpg')."""
+
+    def test_load_mask_with_path_prefix(self, coco_roboflow_rle_dataset: Path) -> None:
+        dataset = COCODataset.detect(coco_roboflow_rle_dataset)
+        assert dataset is not None
+        image_paths = dataset.get_image_paths()
+        assert len(image_paths) == 1
+
+        mask = dataset.load_mask(image_paths[0])
+        assert mask is not None
+        assert mask.shape == (100, 100)
+        assert (mask[:10, :10] == 1).all()
+
+    def test_get_annotations_with_path_prefix(
+        self, coco_roboflow_rle_dataset: Path
+    ) -> None:
+        dataset = COCODataset.detect(coco_roboflow_rle_dataset)
+        assert dataset is not None
+        image_paths = dataset.get_image_paths()
+
+        anns = dataset.get_annotations_for_image(image_paths[0])
+        assert len(anns) == 1
+        assert anns[0]["class_name"] == "object"
+
+
 class TestGetClassMapping:
     """Test get_class_mapping returns correct category mapping."""
 

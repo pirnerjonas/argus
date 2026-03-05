@@ -540,6 +540,23 @@ class COCODataset(Dataset):
 
         return sorted(image_paths, key=lambda p: p.name)
 
+    @staticmethod
+    def _match_image_entry(images: list, image_path: Path) -> dict | None:
+        """Find the image entry matching the given path.
+
+        Matches against the full ``file_name`` value first, then falls back
+        to comparing just the basename so that relative paths like
+        ``"images/foo.jpg"`` still match.
+        """
+        file_name = image_path.name
+        for img in images:
+            if not isinstance(img, dict):
+                continue
+            fn = img.get("file_name")
+            if fn == file_name or (isinstance(fn, str) and Path(fn).name == file_name):
+                return img
+        return None
+
     def get_annotations_for_image(self, image_path: Path) -> list[dict]:
         """Get annotations for a specific image.
 
@@ -550,7 +567,6 @@ class COCODataset(Dataset):
             List of annotation dicts with bbox/polygon in absolute coordinates.
         """
         annotations: list[dict] = []
-        file_name = image_path.name
 
         for ann_file in self.annotation_files:
             try:
@@ -562,12 +578,8 @@ class COCODataset(Dataset):
 
                 # Build image_id lookup
                 images = data.get("images", [])
-                image_id = None
-
-                for img in images:
-                    if isinstance(img, dict) and img.get("file_name") == file_name:
-                        image_id = img.get("id")
-                        break
+                image_entry = self._match_image_entry(images, image_path)
+                image_id = image_entry.get("id") if image_entry else None
 
                 if image_id is None:
                     continue
@@ -751,7 +763,6 @@ class COCODataset(Dataset):
             Mask array of shape (H, W) with class IDs, or None if
             the image is not found in any annotation file.
         """
-        file_name = image_path.name
         found = False
         offset = 1 if self.has_cat_zero else 0
 
@@ -765,11 +776,7 @@ class COCODataset(Dataset):
 
                 # Find image entry
                 images = data.get("images", [])
-                image_entry = None
-                for img in images:
-                    if isinstance(img, dict) and img.get("file_name") == file_name:
-                        image_entry = img
-                        break
+                image_entry = self._match_image_entry(images, image_path)
 
                 if image_entry is None:
                     continue
