@@ -82,7 +82,7 @@ dataset/
 ```
 
 If your annotation filenames include `train`, `val`, or `test`, Argus will treat
-those as splits. Otherwise it defaults to `train`.
+those as splits. Otherwise the dataset is treated as unsplit.
 
 ### Roboflow COCO
 

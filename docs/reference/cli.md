@@ -12,6 +12,7 @@ Commands:
 - `stats`: print class/split statistics
 - `view`: open interactive annotation viewer
 - `split`: create train/val/test splits from an unsplit dataset
+- `unsplit`: merge split datasets into unsplit layout
 - `filter`: keep only selected classes in a copied dataset
 - `convert`: convert between supported segmentation formats
 
@@ -49,10 +50,20 @@ argus-cv view -d /datasets/retail --split val --opacity 0.5
 argus-cv split -d /datasets/animals -o /datasets/animals_splits -r 0.8,0.1,0.1 --seed 42
 ```
 
-- `--dataset-path`, `-d` (default: `.`): unsplit dataset root
+- `--dataset-path`, `-d` (default: `.`): unsplit dataset root (YOLO, COCO, or mask)
 - `--output-path`, `-o` (default: `splits`): output directory
 - `--ratio`, `-r` (default: `0.8,0.1,0.1`): train/val/test ratio
 - `--seed` (default: `42`): random seed
+
+## unsplit
+
+```bash
+argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
+```
+
+- `--dataset-path`, `-d` (default: `.`): split dataset root (YOLO, COCO, or mask)
+- `--output-path`, `-o` (default: `unsplit`): output directory
+- `--collision-policy` (default: `error`): `error`, `prefix-split`, or `hash`
 
 ## filter
 

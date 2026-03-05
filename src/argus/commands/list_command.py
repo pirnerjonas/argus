@@ -33,7 +33,7 @@ def list_datasets(
 ) -> None:
     """List all detected datasets in the specified path.
 
-    Searches for YOLO and COCO format datasets within the given directory,
+    Searches for YOLO, COCO, and mask format datasets within the given directory,
     up to the specified maximum depth.
     """
     path = _resolve_existing_directory(path)

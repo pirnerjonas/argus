@@ -113,9 +113,10 @@ def view(
     dataset = _detect_dataset(dataset_path)
     if not dataset:
         console.print(
-            f"[red]Error: No YOLO or COCO dataset found at {dataset_path}[/red]\n"
+            f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
-            "data.yaml (YOLO) or annotations/ folder (COCO).[/yellow]"
+            "data.yaml (YOLO), annotations/ folder (COCO), or "
+            "images/ + masks/ directories (Mask).[/yellow]"
         )
         raise typer.Exit(1)
 

@@ -19,7 +19,11 @@ from argus.core import (
     filter_yolo_dataset,
     mask_to_polygons,
     split_coco_dataset,
+    split_mask_dataset,
     split_yolo_dataset,
+    unsplit_coco_dataset,
+    unsplit_mask_dataset,
+    unsplit_yolo_dataset,
 )
 ```
 
@@ -46,6 +50,22 @@ from argus.core import (
 ### `split_coco_dataset`
 
 ::: argus.core.split_coco_dataset
+
+### `split_mask_dataset`
+
+::: argus.core.split_mask_dataset
+
+### `unsplit_yolo_dataset`
+
+::: argus.core.unsplit_yolo_dataset
+
+### `unsplit_coco_dataset`
+
+::: argus.core.unsplit_coco_dataset
+
+### `unsplit_mask_dataset`
+
+::: argus.core.unsplit_mask_dataset
 
 ## Filter operations
 
