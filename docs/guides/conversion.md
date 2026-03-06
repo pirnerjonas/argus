@@ -44,7 +44,7 @@ polygon-ring interpretation can vary across training libraries.
 ## Output behavior
 
 - Output directory must be empty or not exist.
-- Relative output paths are resolved next to the input dataset directory.
+- Relative output paths are resolved under the input dataset root.
 - Argus keeps dataset splits when they exist.
 
 ## Common errors

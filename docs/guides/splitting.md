@@ -3,6 +3,10 @@
 Use `argus-cv split` to create train/val/test splits from an unsplit dataset,
 and `argus-cv unsplit` to merge split datasets back into a flat layout.
 
+Relative output paths are resolved under the dataset root. For example,
+`argus-cv split /datasets/animals -o splits` writes to
+`/datasets/animals/splits`.
+
 ## Basic split
 
 ```bash

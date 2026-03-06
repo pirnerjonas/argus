@@ -7,7 +7,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from argus.cli_common import console
-from argus.commands._utils import _resolve_existing_directory
+from argus.commands._utils import _resolve_existing_directory, _resolve_output_path
 from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import Partitioning
 from argus.core.split import (
@@ -35,7 +35,10 @@ def unsplit_dataset(
         typer.Option(
             "--output-path",
             "-o",
-            help="Directory to write the unsplit dataset.",
+            help=(
+                "Directory to write the unsplit dataset. Relative paths resolve "
+                "under the dataset root."
+            ),
         ),
     ] = Path("unsplit"),
     collision_policy: Annotated[
@@ -76,9 +79,7 @@ def unsplit_dataset(
         raise typer.Exit(1)
     typed_policy = cast(CollisionPolicy, collision_policy)
 
-    if not output_path.is_absolute():
-        output_path = dataset_path / output_path
-    output_path = output_path.resolve()
+    output_path = _resolve_output_path(output_path, dataset_path)
 
     if isinstance(dataset, YOLODataset):
         with Progress(

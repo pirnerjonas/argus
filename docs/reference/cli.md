@@ -51,7 +51,7 @@ argus-cv split /datasets/animals -o /datasets/animals_splits -r 0.8,0.1,0.1 --se
 ```
 
 - `DATASET` (default: `.`): unsplit dataset root (YOLO, COCO, or mask)
-- `--output-path`, `-o` (default: `splits`): output directory
+- `--output-path`, `-o` (default: `splits`): output directory; relative paths resolve under `DATASET`
 - `--ratio`, `-r` (default: `0.8,0.1,0.1`): train/val/test ratio
 - `--seed` (default: `42`): random seed
 
@@ -62,7 +62,7 @@ argus-cv unsplit /datasets/animals_splits -o /datasets/animals_unsplit --collisi
 ```
 
 - `DATASET` (default: `.`): split dataset root (YOLO, COCO, or mask)
-- `--output-path`, `-o` (default: `unsplit`): output directory
+- `--output-path`, `-o` (default: `unsplit`): output directory; relative paths resolve under `DATASET`
 - `--collision-policy` (default: `error`): `error`, `prefix-split`, or `hash`
 
 ## filter
@@ -72,7 +72,7 @@ argus-cv filter /datasets/coco -o /datasets/coco_filtered --classes person,car -
 ```
 
 - `DATASET` (default: `.`): source dataset root
-- `--output`, `-o` (default: `filtered`): output directory
+- `--output`, `-o` (default: `filtered`): output directory; relative paths resolve under `DATASET`
 - `--classes`, `-c` (required): comma-separated classes to keep
 - `--no-background`: drop images with no labels after filtering
 - `--symlinks`: symlink images instead of copying
@@ -87,7 +87,7 @@ argus-cv convert -i /datasets/yolo_seg -o /datasets/rf_coco_rle --to roboflow-co
 ```
 
 - `--input-path`, `-i` (default: `.`): source dataset path
-- `--output-path`, `-o` (default: `converted`): output directory
+- `--output-path`, `-o` (default: `converted`): output directory; relative paths resolve under `--input-path`
 - `--to` (default: `yolo-seg`): `yolo-seg`, `coco`, `roboflow-coco`, or `roboflow-coco-rle`
 - `--epsilon-factor`, `-e` (default: `0.005`): polygon simplification for mask -> YOLO
 - `--min-area`, `-a` (default: `100.0`): minimum contour area for mask -> YOLO

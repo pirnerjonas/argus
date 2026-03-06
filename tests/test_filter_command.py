@@ -528,6 +528,73 @@ def test_filter_command_yolo(tmp_path: Path) -> None:
     assert (output_path / "data.yaml").exists()
 
 
+def test_filter_command_resolves_relative_output_under_dataset_root(
+    tmp_path: Path,
+) -> None:
+    """Test filter CLI command resolves relative output paths under the dataset."""
+    dataset_path = tmp_path / "yolo_det_relative_output"
+    _create_yolo_detection_dataset(dataset_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "filter",
+            str(dataset_path),
+            "--output",
+            "filtered_out",
+            "--classes",
+            "ball",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (dataset_path / "filtered_out" / "data.yaml").exists()
+    assert not (tmp_path / "filtered_out").exists()
+
+
+def test_filter_command_uses_dataset_root_for_default_output(tmp_path: Path) -> None:
+    """Test filter CLI command writes the default output under the dataset."""
+    dataset_path = tmp_path / "yolo_det_default_output"
+    _create_yolo_detection_dataset(dataset_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "filter",
+            str(dataset_path),
+            "--classes",
+            "ball",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (dataset_path / "filtered" / "data.yaml").exists()
+    assert not (tmp_path / "filtered").exists()
+
+
+def test_filter_command_absolute_output_stays_absolute(tmp_path: Path) -> None:
+    """Test filter CLI command does not re-anchor absolute output paths."""
+    dataset_path = tmp_path / "yolo_det_absolute_output"
+    _create_yolo_detection_dataset(dataset_path)
+
+    output_path = tmp_path / "absolute_filtered"
+    result = runner.invoke(
+        app,
+        [
+            "filter",
+            str(dataset_path),
+            "--output",
+            str(output_path),
+            "--classes",
+            "ball",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_path / "data.yaml").exists()
+    assert not (dataset_path / "absolute_filtered").exists()
+
+
 def test_filter_command_coco(tmp_path: Path) -> None:
     """Test filter CLI command with COCO dataset."""
     dataset_path = tmp_path / "coco"

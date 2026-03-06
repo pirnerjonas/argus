@@ -226,6 +226,27 @@ def test_split_command_accepts_positional_dataset(tmp_path: Path) -> None:
     assert (output_path / "labels" / "train").is_dir()
 
 
+def test_split_command_resolves_relative_output_under_dataset_root(
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "yolo_unsplit_relative_output"
+    _create_unsplit_yolo_dataset(dataset_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "split",
+            str(dataset_path),
+            "--output-path",
+            "splits_out",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (dataset_path / "splits_out" / "images" / "train").is_dir()
+    assert not (tmp_path / "splits_out").exists()
+
+
 def test_split_command_rejects_existing_splits(yolo_detection_dataset: Path) -> None:
     output_path = yolo_detection_dataset / "output"
     result = runner.invoke(
@@ -369,6 +390,24 @@ def test_unsplit_command_yolo(tmp_path: Path, yolo_detection_dataset: Path) -> N
     assert result.exit_code == 0
     assert (output_path / "images" / "img001.jpg").exists()
     assert (output_path / "labels" / "img001.txt").exists()
+
+
+def test_unsplit_command_resolves_relative_output_under_dataset_root(
+    yolo_detection_dataset: Path,
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "unsplit",
+            str(yolo_detection_dataset),
+            "--output-path",
+            "unsplit_out",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (yolo_detection_dataset / "unsplit_out" / "images" / "img001.jpg").exists()
+    assert not (yolo_detection_dataset.parent / "unsplit_out").exists()
 
 
 def test_unsplit_command_coco(tmp_path: Path, coco_detection_dataset: Path) -> None:
