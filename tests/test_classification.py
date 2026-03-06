@@ -194,7 +194,7 @@ class TestClassificationCLI:
         from argus.cli import app
 
         runner = CliRunner()
-        result = runner.invoke(app, ["stats", "-d", str(yolo_classification_dataset)])
+        result = runner.invoke(app, ["stats", str(yolo_classification_dataset)])
 
         assert result.exit_code == 0
         assert "cat" in result.output

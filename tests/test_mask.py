@@ -323,7 +323,7 @@ class TestStatsCommand:
 
     def test_stats_mask_dataset(self, mask_dataset_grayscale: Path) -> None:
         """Test stats command works with mask datasets."""
-        result = runner.invoke(app, ["stats", "-d", str(mask_dataset_grayscale)])
+        result = runner.invoke(app, ["stats", str(mask_dataset_grayscale)])
 
         assert result.exit_code == 0
         assert "Class Statistics" in result.stdout
@@ -335,7 +335,7 @@ class TestStatsCommand:
 
     def test_stats_shows_pixel_counts(self, mask_dataset_grayscale: Path) -> None:
         """Test stats shows pixel count information."""
-        result = runner.invoke(app, ["stats", "-d", str(mask_dataset_grayscale)])
+        result = runner.invoke(app, ["stats", str(mask_dataset_grayscale)])
 
         assert result.exit_code == 0
         # Should show class names

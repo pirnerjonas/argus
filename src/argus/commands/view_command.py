@@ -56,14 +56,15 @@ def _run_mask_viewer(
 
 
 def view(
-    dataset_path: Annotated[
-        Path,
-        typer.Option(
-            "--dataset-path",
-            "-d",
-            help="Path to the dataset root directory.",
+    dataset: Annotated[
+        Path | None,
+        typer.Argument(
+            help=(
+                "Path to the dataset root directory. Defaults to the current directory."
+            ),
+            show_default=False,
         ),
-    ] = Path("."),
+    ] = None,
     split: Annotated[
         str | None,
         typer.Option(
@@ -107,11 +108,11 @@ def view(
         - T: Toggle annotations (detection/segmentation only)
         - Q / ESC: Quit viewer
     """
-    dataset_path = _resolve_existing_directory(dataset_path)
+    dataset_path = _resolve_existing_directory(dataset or Path("."))
 
     # Detect dataset
-    dataset = _detect_dataset(dataset_path)
-    if not dataset:
+    detected_dataset = _detect_dataset(dataset_path)
+    if not detected_dataset:
         console.print(
             f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
@@ -121,8 +122,10 @@ def view(
         raise typer.Exit(1)
 
     # Validate split if specified
-    if split and split not in dataset.splits:
-        available = ", ".join(dataset.splits) if dataset.splits else "none"
+    if split and split not in detected_dataset.splits:
+        available = (
+            ", ".join(detected_dataset.splits) if detected_dataset.splits else "none"
+        )
         console.print(
             f"[red]Error: Split '{split}' not found in dataset.[/red]\n"
             f"[yellow]Available splits: {available}[/yellow]"
@@ -130,23 +133,27 @@ def view(
         raise typer.Exit(1)
 
     # Generate consistent colors for each class
-    class_colors = _generate_class_colors(dataset.class_names)
+    class_colors = _generate_class_colors(detected_dataset.class_names)
 
     # Handle mask datasets with overlay viewer
-    if dataset.format == DatasetFormat.MASK:
-        assert isinstance(dataset, MaskDataset)
-        _run_mask_viewer(dataset, dataset_path, split, class_colors, opacity)
+    if detected_dataset.format == DatasetFormat.MASK:
+        assert isinstance(detected_dataset, MaskDataset)
+        _run_mask_viewer(detected_dataset, dataset_path, split, class_colors, opacity)
         return
 
     # Handle COCO RLE datasets with mask overlay viewer
-    if isinstance(dataset, COCODataset) and dataset.has_rle:
-        _run_mask_viewer(dataset, dataset_path, split, class_colors, opacity)
+    if isinstance(detected_dataset, COCODataset) and detected_dataset.has_rle:
+        _run_mask_viewer(detected_dataset, dataset_path, split, class_colors, opacity)
         return
 
     # Handle classification datasets with grid viewer
-    if dataset.task == TaskType.CLASSIFICATION:
+    if detected_dataset.task == TaskType.CLASSIFICATION:
         # Use first split if specified, otherwise let get_images_by_class handle it
-        view_split = split if split else (dataset.splits[0] if dataset.splits else None)
+        view_split = (
+            split
+            if split
+            else (detected_dataset.splits[0] if detected_dataset.splits else None)
+        )
 
         with Progress(
             SpinnerColumn(),
@@ -155,14 +162,14 @@ def view(
             transient=True,
         ) as progress:
             progress.add_task("Loading images by class...", total=None)
-            images_by_class = dataset.get_images_by_class(view_split)
+            images_by_class = detected_dataset.get_images_by_class(view_split)
 
         total_images = sum(len(imgs) for imgs in images_by_class.values())
         if total_images == 0:
             console.print("[yellow]No images found in the dataset.[/yellow]")
             return
 
-        num_classes = len(dataset.class_names)
+        num_classes = len(detected_dataset.class_names)
         display_classes = min(num_classes, max_classes) if max_classes else num_classes
 
         console.print(
@@ -174,7 +181,7 @@ def view(
 
         viewer = _ClassificationGridViewer(
             images_by_class=images_by_class,
-            class_names=dataset.class_names,
+            class_names=detected_dataset.class_names,
             window_name=f"Argus Classification Viewer - {dataset_path.name}",
             max_classes=max_classes,
         )
@@ -188,7 +195,7 @@ def view(
             transient=True,
         ) as progress:
             progress.add_task("Loading images...", total=None)
-            image_paths = dataset.get_image_paths(split)
+            image_paths = detected_dataset.get_image_paths(split)
 
         if not image_paths:
             console.print("[yellow]No images found in the dataset.[/yellow]")
@@ -204,7 +211,7 @@ def view(
 
         viewer = _ImageViewer(
             image_paths=image_paths,
-            dataset=dataset,
+            dataset=detected_dataset,
             class_colors=class_colors,
             window_name=f"Argus Viewer - {dataset_path.name}",
         )

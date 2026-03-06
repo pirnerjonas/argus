@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -194,7 +195,26 @@ def test_split_command_yolo_unsplit(tmp_path: Path) -> None:
         app,
         [
             "split",
-            "--dataset-path",
+            str(dataset_path),
+            "--output-path",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_path / "images" / "train").is_dir()
+    assert (output_path / "labels" / "train").is_dir()
+
+
+def test_split_command_accepts_positional_dataset(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "yolo_unsplit_positional"
+    _create_unsplit_yolo_dataset(dataset_path)
+
+    output_path = tmp_path / "cli_output_positional"
+    result = runner.invoke(
+        app,
+        [
+            "split",
             str(dataset_path),
             "--output-path",
             str(output_path),
@@ -212,7 +232,6 @@ def test_split_command_rejects_existing_splits(yolo_detection_dataset: Path) -> 
         app,
         [
             "split",
-            "--dataset-path",
             str(yolo_detection_dataset),
             "--output-path",
             str(output_path),
@@ -229,7 +248,6 @@ def test_split_command_coco_unsplit(tmp_path: Path, coco_unsplit_dataset: Path) 
         app,
         [
             "split",
-            "--dataset-path",
             str(coco_unsplit_dataset),
             "--output-path",
             str(output_path),
@@ -249,7 +267,6 @@ def test_split_command_roboflow_coco_preserves_layout(tmp_path: Path) -> None:
         app,
         [
             "split",
-            "--dataset-path",
             str(dataset_path),
             "--output-path",
             str(output_path),
@@ -268,7 +285,6 @@ def test_split_command_mask_unsplit(tmp_path: Path, mask_dataset_unsplit: Path) 
         app,
         [
             "split",
-            "--dataset-path",
             str(mask_dataset_unsplit),
             "--output-path",
             str(output_path),
@@ -278,6 +294,25 @@ def test_split_command_mask_unsplit(tmp_path: Path, mask_dataset_unsplit: Path) 
     assert result.exit_code == 0
     assert (output_path / "images" / "train").is_dir()
     assert (output_path / "masks" / "train").is_dir()
+
+
+def test_split_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "yolo_unsplit_removed_option"
+    _create_unsplit_yolo_dataset(dataset_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "split",
+            "--dataset-path",
+            str(dataset_path),
+        ],
+    )
+    help_result = runner.invoke(app, ["split", "--help"])
+
+    assert result.exit_code == 2
+    assert help_result.exit_code == 0
+    assert "--dataset-path" not in strip_ansi(help_result.output)
 
 
 def test_unsplit_yolo_dataset(tmp_path: Path, yolo_detection_dataset: Path) -> None:

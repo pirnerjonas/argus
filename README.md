@@ -34,22 +34,19 @@ uvx argus-cv list --path /path/to/datasets
 uvx argus-cv list --path . --max-depth 2
 
 # Show instance statistics for a dataset
-uvx argus-cv stats --dataset-path /path/to/dataset
-
-# Short form
-uvx argus-cv stats -d /path/to/dataset
+uvx argus-cv stats /path/to/dataset
 
 # View annotations interactively
-uvx argus-cv view -d /path/to/dataset --split val
+uvx argus-cv view /path/to/dataset --split val
 
 # Split an unsplit dataset into train/val/test
-uvx argus-cv split -d /path/to/dataset -o /path/to/output -r 0.8,0.1,0.1
+uvx argus-cv split /path/to/dataset -o /path/to/output -r 0.8,0.1,0.1
 
 # Merge a split dataset back into unsplit layout
 uvx argus-cv unsplit -d /path/to/split_dataset -o /path/to/output
 
 # Filter dataset to selected classes
-uvx argus-cv filter -d /path/to/dataset -o /path/to/output --classes person,car
+uvx argus-cv filter /path/to/dataset -o /path/to/output --classes person,car
 
 # Convert mask -> YOLO segmentation
 uvx argus-cv convert -i /path/to/masks -o /path/to/output --to yolo-seg

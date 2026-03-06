@@ -19,10 +19,10 @@
 argus-cv list --path /data
 
 # Instant class stats
-argus-cv stats -d /data/animals
+argus-cv stats /data/animals
 
 # Visual inspection
-argus-cv view -d /data/animals --split val
+argus-cv view /data/animals --split val
 
 # Convert mask dataset to YOLO segmentation
 argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
@@ -56,19 +56,19 @@ argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
 
     ```bash
     argus-cv list --path /datasets
-    argus-cv stats -d /datasets/retail
+    argus-cv stats /datasets/retail
     ```
 
 === "Find label issues"
 
     ```bash
-    argus-cv view -d /datasets/retail --split val
+    argus-cv view /datasets/retail --split val
     ```
 
 === "Create splits"
 
     ```bash
-    argus-cv split -d /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
+    argus-cv split /datasets/retail -o /datasets/retail_splits -r 0.8,0.1,0.1
     ```
 
 === "Merge splits"
