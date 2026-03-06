@@ -20,14 +20,16 @@ from argus.discovery import _detect_dataset
 
 
 def unsplit_dataset(
-    dataset_path: Annotated[
-        Path,
-        typer.Option(
-            "--dataset-path",
-            "-d",
-            help="Path to the split dataset root directory.",
+    dataset: Annotated[
+        Path | None,
+        typer.Argument(
+            help=(
+                "Path to the split dataset root directory. "
+                "Defaults to the current directory."
+            ),
+            show_default=False,
         ),
-    ] = Path("."),
+    ] = None,
     output_path: Annotated[
         Path,
         typer.Option(
@@ -46,7 +48,7 @@ def unsplit_dataset(
     ] = "error",
 ) -> None:
     """Merge a split dataset into an unsplit dataset."""
-    dataset_path = _resolve_existing_directory(dataset_path)
+    dataset_path = _resolve_existing_directory(dataset or Path("."))
 
     dataset = _detect_dataset(dataset_path)
     if not dataset:

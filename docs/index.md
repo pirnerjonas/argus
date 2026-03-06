@@ -74,7 +74,7 @@ argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
 === "Merge splits"
 
     ```bash
-    argus-cv unsplit -d /datasets/retail_splits -o /datasets/retail_unsplit
+    argus-cv unsplit /datasets/retail_splits -o /datasets/retail_unsplit
     ```
 
 === "Convert formats"

@@ -28,14 +28,14 @@ argus-cv split /datasets/animals -o /datasets/animals_splits --seed 7
 ## Merge back to unsplit
 
 ```bash
-argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit
+argus-cv unsplit /datasets/animals_splits -o /datasets/animals_unsplit
 ```
 
 If your split directories contain duplicate filenames, choose a collision
 strategy:
 
 ```bash
-argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
+argus-cv unsplit /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
 ```
 
 `--collision-policy` options:
