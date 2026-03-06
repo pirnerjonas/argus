@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.10.3 (2026-03-06)
+
+### Bug Fixes
+
+- **cli**: Normalize relative output path resolution
+  ([#69](https://github.com/pirnerjonas/argus/pull/69),
+  [`7a5ccb2`](https://github.com/pirnerjonas/argus/commit/7a5ccb2a4d9bf01d72feaaa61ea3d12cf8d3baeb))
+
+
 ## v1.10.2 (2026-03-06)
 
 ### Bug Fixes
