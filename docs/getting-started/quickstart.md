@@ -45,7 +45,7 @@ split.
 ## 5. Merge split dataset back to unsplit (optional)
 
 ```bash
-argus-cv unsplit -d /datasets/traffic_splits -o /datasets/traffic_unsplit
+argus-cv unsplit /datasets/traffic_splits -o /datasets/traffic_unsplit
 ```
 
 ## 6. Convert formats (optional)

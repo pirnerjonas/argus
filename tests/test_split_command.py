@@ -360,7 +360,6 @@ def test_unsplit_command_yolo(tmp_path: Path, yolo_detection_dataset: Path) -> N
         app,
         [
             "unsplit",
-            "--dataset-path",
             str(yolo_detection_dataset),
             "--output-path",
             str(output_path),
@@ -378,7 +377,6 @@ def test_unsplit_command_coco(tmp_path: Path, coco_detection_dataset: Path) -> N
         app,
         [
             "unsplit",
-            "--dataset-path",
             str(coco_detection_dataset),
             "--output-path",
             str(output_path),
@@ -395,7 +393,6 @@ def test_unsplit_command_mask(tmp_path: Path, mask_dataset_grayscale: Path) -> N
         app,
         [
             "unsplit",
-            "--dataset-path",
             str(mask_dataset_grayscale),
             "--output-path",
             str(output_path),
@@ -415,7 +412,6 @@ def test_unsplit_command_rejects_unsplit_dataset(
         app,
         [
             "unsplit",
-            "--dataset-path",
             str(yolo_flat_structure_dataset),
             "--output-path",
             str(output_path),
@@ -434,7 +430,6 @@ def test_unsplit_command_collision_policy_prefix_split(
         app,
         [
             "unsplit",
-            "--dataset-path",
             str(yolo_classification_dataset),
             "--output-path",
             str(output_path),
@@ -447,6 +442,38 @@ def test_unsplit_command_collision_policy_prefix_split(
     cat_files = sorted(p.name for p in (output_path / "cat").glob("*.jpg"))
     assert "img001.jpg" in cat_files
     assert "val_img001.jpg" in cat_files
+
+
+def test_unsplit_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
+    """Test unsplit command no longer accepts --dataset-path."""
+    dataset_path = tmp_path / "yolo_split_removed_option"
+    _create_unsplit_yolo_dataset(dataset_path)
+    split_output = tmp_path / "yolo_split_removed_option_splits"
+
+    split_result = runner.invoke(
+        app,
+        [
+            "split",
+            str(dataset_path),
+            "--output-path",
+            str(split_output),
+        ],
+    )
+    assert split_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "unsplit",
+            "--dataset-path",
+            str(split_output),
+        ],
+    )
+    help_result = runner.invoke(app, ["unsplit", "--help"])
+
+    assert result.exit_code == 2
+    assert help_result.exit_code == 0
+    assert "--dataset-path" not in strip_ansi(help_result.output)
 
 
 def test_is_coco_unsplit_rejects_roboflow_split_dataset(

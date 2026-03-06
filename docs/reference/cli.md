@@ -58,10 +58,10 @@ argus-cv split /datasets/animals -o /datasets/animals_splits -r 0.8,0.1,0.1 --se
 ## unsplit
 
 ```bash
-argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
+argus-cv unsplit /datasets/animals_splits -o /datasets/animals_unsplit --collision-policy prefix-split
 ```
 
-- `--dataset-path`, `-d` (default: `.`): split dataset root (YOLO, COCO, or mask)
+- `DATASET` (default: `.`): split dataset root (YOLO, COCO, or mask)
 - `--output-path`, `-o` (default: `unsplit`): output directory
 - `--collision-policy` (default: `error`): `error`, `prefix-split`, or `hash`
 
