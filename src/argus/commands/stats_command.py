@@ -15,10 +15,9 @@ from argus.discovery import _detect_dataset
 
 
 def stats(
-    dataset_path: Annotated[
+    dataset: Annotated[
         Path | None,
         typer.Argument(
-            metavar="DATASET",
             help=(
                 "Path to the dataset root directory. Defaults to the current directory."
             ),
@@ -32,11 +31,11 @@ def stats(
     The path should point to a dataset root containing data.yaml (YOLO)
     or an annotations/ folder (COCO).
     """
-    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
+    dataset_path = _resolve_existing_directory(dataset or Path("."))
 
     # Detect dataset
-    dataset = _detect_dataset(dataset_path)
-    if not dataset:
+    detected_dataset = _detect_dataset(dataset_path)
+    if not detected_dataset:
         console.print(
             f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
@@ -46,9 +45,9 @@ def stats(
         raise typer.Exit(1)
 
     # Handle mask datasets with pixel statistics
-    if dataset.format == DatasetFormat.MASK:
-        assert isinstance(dataset, MaskDataset)
-        _show_mask_stats(dataset, dataset_path)
+    if detected_dataset.format == DatasetFormat.MASK:
+        assert isinstance(detected_dataset, MaskDataset)
+        _show_mask_stats(detected_dataset, dataset_path)
         return
 
     # Get instance counts with progress indicator
@@ -59,8 +58,8 @@ def stats(
         transient=True,
     ) as progress:
         progress.add_task("Analyzing dataset...", total=None)
-        counts = dataset.get_instance_counts()
-        image_counts = dataset.get_image_counts()
+        counts = detected_dataset.get_instance_counts()
+        image_counts = detected_dataset.get_image_counts()
 
     if not counts:
         console.print("[yellow]No annotations found in the dataset.[/yellow]")
@@ -81,7 +80,9 @@ def stats(
     sorted_classes = sorted(all_classes)
 
     # Create table
-    title = f"Instance Statistics: {dataset_path.name} ({dataset.format.value})"
+    title = (
+        f"Instance Statistics: {dataset_path.name} ({detected_dataset.format.value})"
+    )
     table = Table(title=title)
     table.add_column("Class", style="cyan")
     for split in all_splits:
@@ -126,8 +127,8 @@ def stats(
                 image_parts.append(f"{split}: {img_total}")
 
     console.print(
-        f"\n[green]Dataset: {dataset.format.value.upper()} | "
-        f"Task: {dataset.task.value} | "
+        f"\n[green]Dataset: {detected_dataset.format.value.upper()} | "
+        f"Task: {detected_dataset.task.value} | "
         f"Classes: {len(sorted_classes)} | "
         f"Total instances: {grand_total}[/green]"
     )

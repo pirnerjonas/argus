@@ -20,10 +20,9 @@ from argus.discovery import _detect_dataset
 
 
 def split_dataset(
-    dataset_path: Annotated[
+    dataset: Annotated[
         Path | None,
         typer.Argument(
-            metavar="DATASET",
             help=(
                 "Path to the dataset root directory. Defaults to the current directory."
             ),
@@ -55,10 +54,10 @@ def split_dataset(
     ] = 42,
 ) -> None:
     """Split an unsplit dataset into train/val/test."""
-    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
+    dataset_path = _resolve_existing_directory(dataset or Path("."))
 
-    dataset = _detect_dataset(dataset_path)
-    if not dataset:
+    detected_dataset = _detect_dataset(dataset_path)
+    if not detected_dataset:
         console.print(
             f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
@@ -77,14 +76,14 @@ def split_dataset(
         output_path = dataset_path / output_path
     output_path = output_path.resolve()
 
-    if dataset.partitioning == Partitioning.SPLIT:
+    if detected_dataset.partitioning == Partitioning.SPLIT:
         console.print(
             "[red]Error: Dataset already has splits. "
             "Use an unsplit dataset to run split.[/red]"
         )
         raise typer.Exit(1)
 
-    if isinstance(dataset, YOLODataset):
+    if isinstance(detected_dataset, YOLODataset):
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -93,12 +92,14 @@ def split_dataset(
         ) as progress:
             progress.add_task("Creating YOLO splits...", total=None)
             try:
-                counts = split_yolo_dataset(dataset, output_path, ratios, True, seed)
+                counts = split_yolo_dataset(
+                    detected_dataset, output_path, ratios, True, seed
+                )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc
-    elif isinstance(dataset, COCODataset):
-        coco_dataset = dataset
+    elif isinstance(detected_dataset, COCODataset):
+        coco_dataset = detected_dataset
         if not coco_dataset.annotation_files:
             console.print("[red]Error: No annotation files found.[/red]")
             raise typer.Exit(1)
@@ -124,7 +125,7 @@ def split_dataset(
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc
-    elif isinstance(dataset, MaskDataset):
+    elif isinstance(detected_dataset, MaskDataset):
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -133,7 +134,9 @@ def split_dataset(
         ) as progress:
             progress.add_task("Creating mask dataset splits...", total=None)
             try:
-                counts = split_mask_dataset(dataset, output_path, ratios, True, seed)
+                counts = split_mask_dataset(
+                    detected_dataset, output_path, ratios, True, seed
+                )
             except ValueError as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 raise typer.Exit(1) from exc

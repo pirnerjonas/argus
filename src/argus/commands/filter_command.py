@@ -29,10 +29,9 @@ from argus.discovery import _detect_dataset
 
 
 def filter_dataset(
-    dataset_path: Annotated[
+    dataset: Annotated[
         Path | None,
         typer.Argument(
-            metavar="DATASET",
             help=(
                 "Path to the dataset root directory. Defaults to the current directory."
             ),
@@ -80,7 +79,7 @@ def filter_dataset(
         argus-cv filter dataset -o output --classes ball,player
         argus-cv filter dataset -o output --classes ball --symlinks
     """
-    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
+    dataset_path = _resolve_existing_directory(dataset or Path("."))
 
     # Parse classes
     if not classes:
@@ -96,8 +95,8 @@ def filter_dataset(
         raise typer.Exit(1)
 
     # Detect dataset
-    dataset = _detect_dataset(dataset_path)
-    if not dataset:
+    detected_dataset = _detect_dataset(dataset_path)
+    if not detected_dataset:
         console.print(
             f"[red]Error: No dataset found at {dataset_path}[/red]\n"
             "[yellow]Ensure the path points to a dataset root containing "
@@ -107,9 +106,9 @@ def filter_dataset(
         raise typer.Exit(1)
 
     # Validate classes exist in dataset
-    missing_classes = [c for c in class_list if c not in dataset.class_names]
+    missing_classes = [c for c in class_list if c not in detected_dataset.class_names]
     if missing_classes:
-        available = ", ".join(dataset.class_names)
+        available = ", ".join(detected_dataset.class_names)
         missing = ", ".join(missing_classes)
         console.print(
             f"[red]Error: Classes not found in dataset: {missing}[/red]\n"
@@ -121,7 +120,9 @@ def filter_dataset(
     _ensure_output_directory_empty(output_path)
 
     # Show filter info
-    console.print(f"[cyan]Filtering {dataset.format.value.upper()} dataset[/cyan]")
+    console.print(
+        f"[cyan]Filtering {detected_dataset.format.value.upper()} dataset[/cyan]"
+    )
     console.print(f"  Source: {dataset_path}")
     console.print(f"  Output: {output_path}")
     console.print(f"  Classes to keep: {', '.join(class_list)}")
@@ -144,30 +145,30 @@ def filter_dataset(
             progress.update(task, completed=current, total=total)
 
         try:
-            if dataset.format == DatasetFormat.YOLO:
-                assert isinstance(dataset, YOLODataset)
+            if detected_dataset.format == DatasetFormat.YOLO:
+                assert isinstance(detected_dataset, YOLODataset)
                 stats = filter_yolo_dataset(
-                    dataset=dataset,
+                    dataset=detected_dataset,
                     output_path=output_path,
                     classes=class_list,
                     no_background=no_background,
                     use_symlinks=use_symlinks,
                     progress_callback=update_progress,
                 )
-            elif dataset.format == DatasetFormat.COCO:
-                assert isinstance(dataset, COCODataset)
+            elif detected_dataset.format == DatasetFormat.COCO:
+                assert isinstance(detected_dataset, COCODataset)
                 stats = filter_coco_dataset(
-                    dataset=dataset,
+                    dataset=detected_dataset,
                     output_path=output_path,
                     classes=class_list,
                     no_background=no_background,
                     use_symlinks=use_symlinks,
                     progress_callback=update_progress,
                 )
-            elif dataset.format == DatasetFormat.MASK:
-                assert isinstance(dataset, MaskDataset)
+            elif detected_dataset.format == DatasetFormat.MASK:
+                assert isinstance(detected_dataset, MaskDataset)
                 stats = filter_mask_dataset(
-                    dataset=dataset,
+                    dataset=detected_dataset,
                     output_path=output_path,
                     classes=class_list,
                     no_background=no_background,
@@ -176,7 +177,8 @@ def filter_dataset(
                 )
             else:
                 console.print(
-                    f"[red]Error: Unsupported dataset format: {dataset.format}[/red]"
+                    "[red]Error: Unsupported dataset format: "
+                    f"{detected_dataset.format}[/red]"
                 )
                 raise typer.Exit(1)
         except ValueError as exc:
