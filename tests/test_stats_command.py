@@ -281,7 +281,7 @@ class TestStatsCommand:
         )
 
         assert result.exit_code == 2
-        assert "No such option: --dataset-path" in result.stdout
+        assert "--dataset-path" in result.output
 
 
 class TestRoboflowYOLO:

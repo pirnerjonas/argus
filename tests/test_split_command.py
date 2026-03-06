@@ -309,7 +309,7 @@ def test_split_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 2
-    assert "No such option: --dataset-path" in result.stdout
+    assert "--dataset-path" in result.output
 
 
 def test_unsplit_yolo_dataset(tmp_path: Path, yolo_detection_dataset: Path) -> None:

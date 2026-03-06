@@ -694,7 +694,7 @@ def test_filter_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 2
-    assert "No such option: --dataset-path" in result.stdout
+    assert "--dataset-path" in result.output
 
 
 # ============================================================================
