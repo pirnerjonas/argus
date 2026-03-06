@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.10.2 (2026-03-06)
+
+### Bug Fixes
+
+- **cli**: Make unsplit dataset path positional
+  ([#68](https://github.com/pirnerjonas/argus/pull/68),
+  [`96b9c4a`](https://github.com/pirnerjonas/argus/commit/96b9c4a5ab99fa1acb3c4e5bed4349c12abd0543))
+
+
 ## v1.10.1 (2026-03-06)
 
 ### Bug Fixes
