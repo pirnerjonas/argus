@@ -6,6 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import yaml
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -692,9 +693,11 @@ def test_filter_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
             "ball",
         ],
     )
+    help_result = runner.invoke(app, ["filter", "--help"])
 
     assert result.exit_code == 2
-    assert "--dataset-path" in result.output
+    assert help_result.exit_code == 0
+    assert "--dataset-path" not in strip_ansi(help_result.output)
 
 
 # ============================================================================

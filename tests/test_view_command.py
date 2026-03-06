@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -44,6 +45,8 @@ def test_view_command_rejects_removed_dataset_option(
             str(yolo_detection_dataset),
         ],
     )
+    help_result = runner.invoke(app, ["view", "--help"])
 
     assert result.exit_code == 2
-    assert "--dataset-path" in result.output
+    assert help_result.exit_code == 0
+    assert "--dataset-path" not in strip_ansi(help_result.output)

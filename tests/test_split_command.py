@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -307,9 +308,11 @@ def test_split_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
             str(dataset_path),
         ],
     )
+    help_result = runner.invoke(app, ["split", "--help"])
 
     assert result.exit_code == 2
-    assert "--dataset-path" in result.output
+    assert help_result.exit_code == 0
+    assert "--dataset-path" not in strip_ansi(help_result.output)
 
 
 def test_unsplit_yolo_dataset(tmp_path: Path, yolo_detection_dataset: Path) -> None:

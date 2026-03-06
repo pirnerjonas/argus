@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 
+from click.termui import strip_ansi
 from typer.testing import CliRunner
 
 from argus.cli import app
@@ -279,9 +280,11 @@ class TestStatsCommand:
             app,
             ["stats", "--dataset-path", str(yolo_detection_dataset)],
         )
+        help_result = runner.invoke(app, ["stats", "--help"])
 
         assert result.exit_code == 2
-        assert "--dataset-path" in result.output
+        assert help_result.exit_code == 0
+        assert "--dataset-path" not in strip_ansi(help_result.output)
 
 
 class TestRoboflowYOLO:
