@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.10.1 (2026-03-06)
+
+### Bug Fixes
+
+- **cli**: Clean up positional dataset args ([#67](https://github.com/pirnerjonas/argus/pull/67),
+  [`e28f071`](https://github.com/pirnerjonas/argus/commit/e28f071e042af3473f0cc98005a548b01a2014db))
+
+- **cli**: Make dataset paths positional for common commands
+  ([#67](https://github.com/pirnerjonas/argus/pull/67),
+  [`e28f071`](https://github.com/pirnerjonas/argus/commit/e28f071e042af3473f0cc98005a548b01a2014db))
+
+### Testing
+
+- **cli**: Align full suite with positional dataset args
+  ([#67](https://github.com/pirnerjonas/argus/pull/67),
+  [`e28f071`](https://github.com/pirnerjonas/argus/commit/e28f071e042af3473f0cc98005a548b01a2014db))
+
+- **cli**: Harden removed option assertions ([#67](https://github.com/pirnerjonas/argus/pull/67),
+  [`e28f071`](https://github.com/pirnerjonas/argus/commit/e28f071e042af3473f0cc98005a548b01a2014db))
+
+
 ## v1.10.0 (2026-03-05)
 
 ### Features
