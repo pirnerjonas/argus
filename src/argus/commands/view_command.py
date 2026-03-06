@@ -57,13 +57,15 @@ def _run_mask_viewer(
 
 def view(
     dataset_path: Annotated[
-        Path,
-        typer.Option(
-            "--dataset-path",
-            "-d",
-            help="Path to the dataset root directory.",
+        Path | None,
+        typer.Argument(
+            metavar="DATASET",
+            help=(
+                "Path to the dataset root directory. Defaults to the current directory."
+            ),
+            show_default=False,
         ),
-    ] = Path("."),
+    ] = None,
     split: Annotated[
         str | None,
         typer.Option(
@@ -107,7 +109,7 @@ def view(
         - T: Toggle annotations (detection/segmentation only)
         - Q / ESC: Quit viewer
     """
-    dataset_path = _resolve_existing_directory(dataset_path)
+    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
 
     # Detect dataset
     dataset = _detect_dataset(dataset_path)

@@ -7,7 +7,7 @@ class.
 ## Example
 
 ```bash
-argus-cv stats -d /datasets/retail
+argus-cv stats /datasets/retail
 ```
 
 Argus prints a table by class and split. It also includes a summary with:

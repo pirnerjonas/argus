@@ -6,7 +6,7 @@ and `argus-cv unsplit` to merge split datasets back into a flat layout.
 ## Basic split
 
 ```bash
-argus-cv split -d /datasets/animals -o /datasets/animals_splits
+argus-cv split /datasets/animals -o /datasets/animals_splits
 ```
 
 Argus uses a 0.8/0.1/0.1 ratio and stratified sampling by default.
@@ -14,7 +14,7 @@ Argus uses a 0.8/0.1/0.1 ratio and stratified sampling by default.
 ## Custom ratio
 
 ```bash
-argus-cv split -d /datasets/animals -o /datasets/animals_splits -r 0.7,0.2,0.1
+argus-cv split /datasets/animals -o /datasets/animals_splits -r 0.7,0.2,0.1
 ```
 
 Ratios can sum to 1.0 or 100.
@@ -22,7 +22,7 @@ Ratios can sum to 1.0 or 100.
 ## Set a seed for determinism
 
 ```bash
-argus-cv split -d /datasets/animals -o /datasets/animals_splits --seed 7
+argus-cv split /datasets/animals -o /datasets/animals_splits --seed 7
 ```
 
 ## Merge back to unsplit

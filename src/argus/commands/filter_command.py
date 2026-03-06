@@ -30,13 +30,15 @@ from argus.discovery import _detect_dataset
 
 def filter_dataset(
     dataset_path: Annotated[
-        Path,
-        typer.Option(
-            "--dataset-path",
-            "-d",
-            help="Path to the dataset root directory.",
+        Path | None,
+        typer.Argument(
+            metavar="DATASET",
+            help=(
+                "Path to the dataset root directory. Defaults to the current directory."
+            ),
+            show_default=False,
         ),
-    ] = Path("."),
+    ] = None,
     output_path: Annotated[
         Path,
         typer.Option(
@@ -74,11 +76,11 @@ def filter_dataset(
     Class IDs are remapped to sequential values (0, 1, 2, ...).
 
     Examples:
-        argus-cv filter -d dataset -o output --classes ball --no-background
-        argus-cv filter -d dataset -o output --classes ball,player
-        argus-cv filter -d dataset -o output --classes ball --symlinks
+        argus-cv filter dataset -o output --classes ball --no-background
+        argus-cv filter dataset -o output --classes ball,player
+        argus-cv filter dataset -o output --classes ball --symlinks
     """
-    dataset_path = _resolve_existing_directory(dataset_path)
+    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
 
     # Parse classes
     if not classes:

@@ -16,13 +16,15 @@ from argus.discovery import _detect_dataset
 
 def stats(
     dataset_path: Annotated[
-        Path,
-        typer.Option(
-            "--dataset-path",
-            "-d",
-            help="Path to the dataset root directory.",
+        Path | None,
+        typer.Argument(
+            metavar="DATASET",
+            help=(
+                "Path to the dataset root directory. Defaults to the current directory."
+            ),
+            show_default=False,
         ),
-    ] = Path("."),
+    ] = None,
 ) -> None:
     """Show instance statistics for a dataset.
 
@@ -30,7 +32,7 @@ def stats(
     The path should point to a dataset root containing data.yaml (YOLO)
     or an annotations/ folder (COCO).
     """
-    dataset_path = _resolve_existing_directory(dataset_path)
+    dataset_path = _resolve_existing_directory(dataset_path or Path("."))
 
     # Detect dataset
     dataset = _detect_dataset(dataset_path)

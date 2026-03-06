@@ -5,7 +5,7 @@ Use `argus-cv filter` to create a filtered copy of a dataset containing only spe
 ## Basic usage
 
 ```bash
-argus-cv filter -d /datasets/coco -o /datasets/coco_filtered --classes person,car
+argus-cv filter /datasets/coco -o /datasets/coco_filtered --classes person,car
 ```
 
 This creates a new dataset with only the `person` and `car` classes. Class IDs are automatically remapped to sequential values (0, 1, 2, ...).
@@ -13,7 +13,7 @@ This creates a new dataset with only the `person` and `car` classes. Class IDs a
 ## Filter to a single class
 
 ```bash
-argus-cv filter -d /datasets/yolo -o /datasets/yolo_balls --classes ball
+argus-cv filter /datasets/yolo -o /datasets/yolo_balls --classes ball
 ```
 
 ## Exclude background images
@@ -21,7 +21,7 @@ argus-cv filter -d /datasets/yolo -o /datasets/yolo_balls --classes ball
 By default, images without annotations (after filtering) are kept. Use `--no-background` to exclude them:
 
 ```bash
-argus-cv filter -d /datasets/coco -o /datasets/coco_filtered --classes dog --no-background
+argus-cv filter /datasets/coco -o /datasets/coco_filtered --classes dog --no-background
 ```
 
 This is useful when you want a dataset with only images that contain your target class.
@@ -31,7 +31,7 @@ This is useful when you want a dataset with only images that contain your target
 For large datasets, use `--symlinks` to create symbolic links instead of copying images:
 
 ```bash
-argus-cv filter -d /datasets/large -o /datasets/filtered --classes cat --symlinks
+argus-cv filter /datasets/large -o /datasets/filtered --classes cat --symlinks
 ```
 
 This saves disk space and speeds up the filtering process significantly.

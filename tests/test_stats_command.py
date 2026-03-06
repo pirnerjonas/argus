@@ -228,9 +228,7 @@ class TestStatsCommand:
 
     def test_stats_yolo_dataset(self, yolo_detection_dataset: Path) -> None:
         """Test stats command with a YOLO dataset."""
-        result = runner.invoke(
-            app, ["stats", "--dataset-path", str(yolo_detection_dataset)]
-        )
+        result = runner.invoke(app, ["stats", str(yolo_detection_dataset)])
 
         assert result.exit_code == 0
         assert "person" in result.stdout
@@ -242,9 +240,7 @@ class TestStatsCommand:
 
     def test_stats_coco_dataset(self, coco_detection_dataset: Path) -> None:
         """Test stats command with a COCO dataset."""
-        result = runner.invoke(
-            app, ["stats", "--dataset-path", str(coco_detection_dataset)]
-        )
+        result = runner.invoke(app, ["stats", str(coco_detection_dataset)])
 
         assert result.exit_code == 0
         assert "person" in result.stdout
@@ -255,32 +251,37 @@ class TestStatsCommand:
     def test_stats_nonexistent_path(self, tmp_path: Path) -> None:
         """Test stats command with non-existent path."""
         nonexistent = tmp_path / "nonexistent"
-        result = runner.invoke(app, ["stats", "--dataset-path", str(nonexistent)])
+        result = runner.invoke(app, ["stats", str(nonexistent)])
 
         assert result.exit_code == 1
         assert "does not exist" in result.stdout
 
     def test_stats_invalid_dataset(self, empty_directory: Path) -> None:
         """Test stats command with invalid dataset path."""
-        result = runner.invoke(app, ["stats", "--dataset-path", str(empty_directory)])
+        result = runner.invoke(app, ["stats", str(empty_directory)])
 
         assert result.exit_code == 1
         assert "No dataset found" in result.stdout
 
-    def test_stats_short_option(self, yolo_detection_dataset: Path) -> None:
-        """Test stats command with short -d option."""
-        result = runner.invoke(app, ["stats", "-d", str(yolo_detection_dataset)])
-
-        assert result.exit_code == 0
-        assert "person" in result.stdout
-
     def test_stats_shows_format_and_task(self, yolo_detection_dataset: Path) -> None:
         """Test that stats shows dataset format and task type."""
-        result = runner.invoke(app, ["stats", "-d", str(yolo_detection_dataset)])
+        result = runner.invoke(app, ["stats", str(yolo_detection_dataset)])
 
         assert result.exit_code == 0
         assert "YOLO" in result.stdout
         assert "detection" in result.stdout
+
+    def test_stats_rejects_removed_dataset_option(
+        self, yolo_detection_dataset: Path
+    ) -> None:
+        """Test stats command no longer accepts --dataset-path."""
+        result = runner.invoke(
+            app,
+            ["stats", "--dataset-path", str(yolo_detection_dataset)],
+        )
+
+        assert result.exit_code == 2
+        assert "No such option: --dataset-path" in result.stdout
 
 
 class TestRoboflowYOLO:
@@ -345,7 +346,7 @@ class TestRoboflowYOLO:
 
     def test_stats_command_roboflow(self, roboflow_yolo_dataset: Path) -> None:
         """Test stats CLI command with Roboflow YOLO dataset."""
-        result = runner.invoke(app, ["stats", "-d", str(roboflow_yolo_dataset)])
+        result = runner.invoke(app, ["stats", str(roboflow_yolo_dataset)])
 
         assert result.exit_code == 0
         assert "ball" in result.stdout

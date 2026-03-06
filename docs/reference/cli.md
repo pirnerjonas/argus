@@ -28,18 +28,18 @@ argus-cv list --path /datasets --max-depth 3
 ## stats
 
 ```bash
-argus-cv stats -d /datasets/retail
+argus-cv stats /datasets/retail
 ```
 
-- `--dataset-path`, `-d` (default: `.`): dataset root path
+- `DATASET` (default: `.`): dataset root path
 
 ## view
 
 ```bash
-argus-cv view -d /datasets/retail --split val --opacity 0.5
+argus-cv view /datasets/retail --split val --opacity 0.5
 ```
 
-- `--dataset-path`, `-d` (default: `.`): dataset root path
+- `DATASET` (default: `.`): dataset root path
 - `--split`, `-s`: split to view (`train`, `val`, `test`)
 - `--max-classes`, `-m`: cap classes in classification grid viewer
 - `--opacity`, `-o` (default: `0.5`): mask overlay opacity (`0.0..1.0`)
@@ -47,10 +47,10 @@ argus-cv view -d /datasets/retail --split val --opacity 0.5
 ## split
 
 ```bash
-argus-cv split -d /datasets/animals -o /datasets/animals_splits -r 0.8,0.1,0.1 --seed 42
+argus-cv split /datasets/animals -o /datasets/animals_splits -r 0.8,0.1,0.1 --seed 42
 ```
 
-- `--dataset-path`, `-d` (default: `.`): unsplit dataset root (YOLO, COCO, or mask)
+- `DATASET` (default: `.`): unsplit dataset root (YOLO, COCO, or mask)
 - `--output-path`, `-o` (default: `splits`): output directory
 - `--ratio`, `-r` (default: `0.8,0.1,0.1`): train/val/test ratio
 - `--seed` (default: `42`): random seed
@@ -68,10 +68,10 @@ argus-cv unsplit -d /datasets/animals_splits -o /datasets/animals_unsplit --coll
 ## filter
 
 ```bash
-argus-cv filter -d /datasets/coco -o /datasets/coco_filtered --classes person,car --no-background
+argus-cv filter /datasets/coco -o /datasets/coco_filtered --classes person,car --no-background
 ```
 
-- `--dataset-path`, `-d` (default: `.`): source dataset root
+- `DATASET` (default: `.`): source dataset root
 - `--output`, `-o` (default: `filtered`): output directory
 - `--classes`, `-c` (required): comma-separated classes to keep
 - `--no-background`: drop images with no labels after filtering

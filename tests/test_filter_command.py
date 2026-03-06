@@ -514,7 +514,6 @@ def test_filter_command_yolo(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -538,7 +537,6 @@ def test_filter_command_coco(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -561,7 +559,6 @@ def test_filter_command_mask(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -584,7 +581,6 @@ def test_filter_command_no_background(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -608,7 +604,6 @@ def test_filter_command_symlinks(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -630,7 +625,6 @@ def test_filter_command_no_classes_error(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
         ],
     )
@@ -648,7 +642,6 @@ def test_filter_command_invalid_class_error(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--classes",
             "nonexistent",
@@ -672,7 +665,6 @@ def test_filter_command_output_exists_error(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),
@@ -683,6 +675,26 @@ def test_filter_command_output_exists_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "already exists" in result.stdout
+
+
+def test_filter_command_rejects_removed_dataset_option(tmp_path: Path) -> None:
+    """Test filter command no longer accepts --dataset-path."""
+    dataset_path = tmp_path / "yolo_det_removed_option"
+    _create_yolo_detection_dataset(dataset_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "filter",
+            "--dataset-path",
+            str(dataset_path),
+            "--classes",
+            "ball",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "No such option: --dataset-path" in result.stdout
 
 
 # ============================================================================
@@ -800,7 +812,6 @@ def test_filter_roboflow_yolo_cli(tmp_path: Path) -> None:
         app,
         [
             "filter",
-            "--dataset-path",
             str(dataset_path),
             "--output",
             str(output_path),

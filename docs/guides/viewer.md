@@ -6,19 +6,19 @@ it blends the segmentation mask over the image.
 ## Launching the viewer
 
 ```bash
-argus-cv view -d /datasets/retail
+argus-cv view /datasets/retail
 ```
 
 ### View a specific split
 
 ```bash
-argus-cv view -d /datasets/retail --split val
+argus-cv view /datasets/retail --split val
 ```
 
 ### Adjust mask opacity
 
 ```bash
-argus-cv view -d /datasets/roads --opacity 0.3
+argus-cv view /datasets/roads --opacity 0.3
 ```
 
 ## Controls
