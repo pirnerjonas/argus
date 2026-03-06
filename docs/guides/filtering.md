@@ -2,6 +2,10 @@
 
 Use `argus-cv filter` to create a filtered copy of a dataset containing only specified classes.
 
+Relative output paths are resolved under the dataset root. For example,
+`argus-cv filter /datasets/coco -o filtered --classes person` writes to
+`/datasets/coco/filtered`.
+
 ## Basic usage
 
 ```bash

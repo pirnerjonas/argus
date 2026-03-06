@@ -43,7 +43,10 @@ def filter_dataset(
         typer.Option(
             "--output",
             "-o",
-            help="Output directory for filtered dataset.",
+            help=(
+                "Output directory for filtered dataset. Relative paths resolve "
+                "under the dataset root."
+            ),
         ),
     ] = Path("filtered"),
     classes: Annotated[
@@ -116,7 +119,7 @@ def filter_dataset(
         )
         raise typer.Exit(1)
 
-    output_path = _resolve_output_path(output_path, dataset_path.parent)
+    output_path = _resolve_output_path(output_path, dataset_path)
     _ensure_output_directory_empty(output_path)
 
     # Show filter info

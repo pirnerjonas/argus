@@ -332,6 +332,69 @@ class TestConvertCLI:
         assert "Conversion complete" in result.stdout
         assert output_path.exists()
 
+    def test_convert_command_resolves_relative_output_under_dataset_root(
+        self, mask_dataset_grayscale: Path
+    ) -> None:
+        """Test convert command resolves relative output paths under the input."""
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "-i",
+                str(mask_dataset_grayscale),
+                "-o",
+                "converted_out",
+                "--to",
+                "yolo-seg",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert (mask_dataset_grayscale / "converted_out" / "data.yaml").exists()
+        assert not (mask_dataset_grayscale.parent / "converted_out").exists()
+
+    def test_convert_command_uses_dataset_root_for_default_output(
+        self, mask_dataset_grayscale: Path
+    ) -> None:
+        """Test convert command writes the default output under the input."""
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "-i",
+                str(mask_dataset_grayscale),
+                "--to",
+                "yolo-seg",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert (mask_dataset_grayscale / "converted" / "data.yaml").exists()
+        assert not (mask_dataset_grayscale.parent / "converted").exists()
+
+    def test_convert_command_absolute_output_stays_absolute(
+        self, mask_dataset_grayscale: Path, tmp_path: Path
+    ) -> None:
+        """Test convert command does not re-anchor absolute output paths."""
+        output_path = tmp_path / "absolute_converted"
+
+        result = runner.invoke(
+            app,
+            [
+                "convert",
+                "-i",
+                str(mask_dataset_grayscale),
+                "-o",
+                str(output_path),
+                "--to",
+                "yolo-seg",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert (output_path / "data.yaml").exists()
+        assert not (mask_dataset_grayscale / "absolute_converted").exists()
+
     def test_convert_command_with_params(
         self, mask_dataset_grayscale: Path, tmp_path: Path
     ) -> None:

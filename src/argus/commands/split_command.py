@@ -7,7 +7,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from argus.cli_common import console
-from argus.commands._utils import _resolve_existing_directory
+from argus.commands._utils import _resolve_existing_directory, _resolve_output_path
 from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import Partitioning
 from argus.core.split import (
@@ -34,7 +34,10 @@ def split_dataset(
         typer.Option(
             "--output-path",
             "-o",
-            help="Directory to write the split dataset.",
+            help=(
+                "Directory to write the split dataset. Relative paths resolve "
+                "under the dataset root."
+            ),
         ),
     ] = Path("splits"),
     ratio: Annotated[
@@ -72,9 +75,7 @@ def split_dataset(
         console.print(f"[red]Error: {exc}[/red]")
         raise typer.Exit(1) from exc
 
-    if not output_path.is_absolute():
-        output_path = dataset_path / output_path
-    output_path = output_path.resolve()
+    output_path = _resolve_output_path(output_path, dataset_path)
 
     if detected_dataset.partitioning == Partitioning.SPLIT:
         console.print(

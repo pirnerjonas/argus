@@ -20,7 +20,7 @@ def _resolve_existing_directory(path: Path) -> Path:
 
 
 def _resolve_output_path(output_path: Path, base_path: Path) -> Path:
-    """Resolve output path relative to a base path when needed."""
+    """Resolve an output path relative to a command-specific dataset root."""
     if not output_path.is_absolute():
         output_path = base_path / output_path
     return output_path.resolve()

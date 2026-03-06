@@ -41,7 +41,10 @@ def convert_dataset(
         typer.Option(
             "--output-path",
             "-o",
-            help="Output directory for converted dataset.",
+            help=(
+                "Output directory for converted dataset. Relative paths resolve "
+                "under the input dataset root."
+            ),
         ),
     ] = Path("converted"),
     to_format: Annotated[
@@ -99,7 +102,7 @@ def convert_dataset(
         raise typer.Exit(1)
 
     input_path = _resolve_existing_directory(input_path)
-    output_path = _resolve_output_path(output_path, input_path.parent)
+    output_path = _resolve_output_path(output_path, input_path)
     _ensure_output_directory_empty(output_path)
 
     if to_format == "yolo-seg":
