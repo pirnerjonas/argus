@@ -1110,3 +1110,122 @@ def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), mask)
 
     return dataset_path
+
+
+# ---------------------------------------------------------------------------
+# Real-image fixtures for ultralytics cross-validation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def yolo_real_detection_dataset(tmp_path: Path) -> Path:
+    """Create a YOLO detection dataset with real images for ultralytics.
+
+    Includes:
+        - train/img001: 2 annotations (class 0, class 1)
+        - train/img002: 1 annotation  (class 0)
+        - train/img003: empty label file (background)
+        - train/img004: no label file at all (missing label)
+        - val/img005: 1 annotation  (class 2)
+        - val/img006: empty label file (background)
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "yolo_real_det"
+    dataset_path.mkdir()
+
+    # data.yaml with absolute path (required by ultralytics)
+    yaml_content = (
+        f"path: {dataset_path}\n"
+        "train: images/train\n"
+        "val: images/val\n"
+        "names:\n"
+        "  0: person\n"
+        "  1: car\n"
+        "  2: bicycle\n"
+    )
+    (dataset_path / "data.yaml").write_text(yaml_content)
+
+    for split in ("train", "val"):
+        (dataset_path / "images" / split).mkdir(parents=True)
+        (dataset_path / "labels" / split).mkdir(parents=True)
+
+    # Helper to write a 100x100 image
+    def _write_img(rel: str) -> None:
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(dataset_path / rel), img)
+
+    # --- train split ---
+    _write_img("images/train/img001.jpg")
+    (dataset_path / "labels/train/img001.txt").write_text(
+        "0 0.5 0.5 0.2 0.3\n1 0.3 0.7 0.1 0.2\n"
+    )
+
+    _write_img("images/train/img002.jpg")
+    (dataset_path / "labels/train/img002.txt").write_text("0 0.6 0.4 0.15 0.25\n")
+
+    _write_img("images/train/img003.jpg")
+    (dataset_path / "labels/train/img003.txt").write_text("")  # background
+
+    _write_img("images/train/img004.jpg")
+    # No label file for img004 — ultralytics sees this as background
+
+    # --- val split ---
+    _write_img("images/val/img005.jpg")
+    (dataset_path / "labels/val/img005.txt").write_text("2 0.5 0.5 0.2 0.3\n")
+
+    _write_img("images/val/img006.jpg")
+    (dataset_path / "labels/val/img006.txt").write_text("")  # background
+
+    return dataset_path
+
+
+@pytest.fixture
+def yolo_real_segmentation_dataset(tmp_path: Path) -> Path:
+    """Create a YOLO segmentation dataset with real images for ultralytics.
+
+    Includes polygon labels (>5 columns per line).
+    """
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "yolo_real_seg"
+    dataset_path.mkdir()
+
+    yaml_content = (
+        f"path: {dataset_path}\n"
+        "train: images/train\n"
+        "val: images/val\n"
+        "names:\n"
+        "  0: cat\n"
+        "  1: dog\n"
+    )
+    (dataset_path / "data.yaml").write_text(yaml_content)
+
+    for split in ("train", "val"):
+        (dataset_path / "images" / split).mkdir(parents=True)
+        (dataset_path / "labels" / split).mkdir(parents=True)
+
+    def _write_img(rel: str) -> None:
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(dataset_path / rel), img)
+
+    # train
+    _write_img("images/train/img001.jpg")
+    (dataset_path / "labels/train/img001.txt").write_text(
+        "0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.1\n"
+    )
+
+    _write_img("images/train/img002.jpg")
+    (dataset_path / "labels/train/img002.txt").write_text(
+        "1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9\n"
+    )
+
+    # val
+    _write_img("images/val/img003.jpg")
+    (dataset_path / "labels/val/img003.txt").write_text(
+        "0 0.15 0.25 0.35 0.45 0.55 0.65\n1 0.2 0.3 0.4 0.5 0.6 0.7\n"
+    )
+
+    return dataset_path
