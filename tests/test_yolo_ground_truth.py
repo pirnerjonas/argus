@@ -72,10 +72,10 @@ class TestImageCounts:
     """Cross-validate argus get_image_counts() against ultralytics."""
 
     def test_train_image_counts(self, yolo_real_detection_dataset: Path) -> None:
-        """Train split: 3 label files + 1 missing-label image.
+        """Train split: 4 images, 2 background (empty label + missing label).
 
-        Argus counts label files -> total=3, background=1.
-        Ultralytics scans images -> total=4, background=2 (empty + missing).
+        Both argus and ultralytics scan the image directory and derive label
+        paths, so counts should agree.
         """
         yaml_path = yolo_real_detection_dataset / "data.yaml"
         gt = get_ground_truth_stats(yaml_path, split="train")
@@ -84,14 +84,9 @@ class TestImageCounts:
         assert dataset is not None
         argus_counts = dataset.get_image_counts()
 
-        # Ultralytics sees 4 images (scans the image directory)
-        assert gt["total"] == 4
-        # Ultralytics sees 2 backgrounds: empty label + missing label
-        assert gt["background"] == 2
-
-        # Argus counts label files only, so it sees 3 total, 1 background
-        assert argus_counts["train"]["total"] == 3
-        assert argus_counts["train"]["background"] == 1
+        # Both should agree: 4 total, 2 background
+        assert gt["total"] == argus_counts["train"]["total"]
+        assert gt["background"] == argus_counts["train"]["background"]
 
     def test_val_image_counts(self, yolo_real_detection_dataset: Path) -> None:
         """Val split: all images have label files, counts should agree."""
@@ -212,9 +207,8 @@ class TestBackgroundVariants:
         assert counts["train"]["total"] == 1
         assert counts["train"]["background"] == 1
 
-    def test_missing_label_is_background_in_ultralytics(self, tmp_path: Path) -> None:
-        """An image with no label file: ultralytics counts as background,
-        argus does not see the image at all (counts label files)."""
+    def test_missing_label_is_background(self, tmp_path: Path) -> None:
+        """An image with no label file is background for both."""
         import cv2
         import numpy as np
 
@@ -231,8 +225,8 @@ class TestBackgroundVariants:
         dataset = YOLODataset.detect(ds)
         assert dataset is not None
         counts = dataset.get_image_counts()
-        # Argus counts label files, so the image is invisible
-        assert counts["train"]["total"] == 0
+        assert counts["train"]["total"] == 1
+        assert counts["train"]["background"] == 1
 
     def test_whitespace_only_label_is_background(self, tmp_path: Path) -> None:
         """A label file with only whitespace is background for both."""

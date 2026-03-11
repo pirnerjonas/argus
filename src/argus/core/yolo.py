@@ -294,8 +294,10 @@ class YOLODataset(Dataset):
     def get_instance_counts(self) -> dict[str, dict[str, int]]:
         """Get the number of annotation instances per class, per split.
 
-        For detection/segmentation: Parses all label files in labels/{split}/*.txt
-        and counts occurrences of each class ID.
+        For detection/segmentation: Scans images and reads the corresponding
+        label file (derived by replacing ``images`` with ``labels`` and the
+        extension with ``.txt``).  Orphaned label files without a matching
+        image are ignored, matching ultralytics behaviour.
 
         For classification: Counts images in each class directory
         (1 image = 1 instance).
@@ -307,41 +309,48 @@ class YOLODataset(Dataset):
         if self.task == TaskType.CLASSIFICATION:
             return self._get_classification_instance_counts()
 
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         counts: dict[str, dict[str, int]] = {}
 
         # Build class_id -> class_name mapping
         id_to_name = {i: name for i, name in enumerate(self.class_names)}
 
-        # Determine which label dirs actually exist
-        has_split_label_dirs = (
-            any(self.get_split_dirs(s)[1].is_dir() for s in self.splits)
+        # Determine which image dirs actually exist
+        has_split_image_dirs = (
+            any(self.get_split_dirs(s)[0].is_dir() for s in self.splits)
             if self.splits
             else False
         )
 
-        # If splits are declared but no label folders exist, treat as unsplit.
-        if self.splits and not has_split_label_dirs:
+        # If splits are declared but no image folders exist, treat as unsplit.
+        if self.splits and not has_split_image_dirs:
             splits_to_process = ["unsplit"]
         else:
             splits_to_process = self.splits if self.splits else ["unsplit"]
 
-        # Get label directories for each split
         for split in splits_to_process:
             split_counts: dict[str, int] = {}
 
-            # Find label directory for this split
             if split == "unsplit":
+                image_dir = self.path / "images"
                 label_dir = self.path / "labels"
             else:
-                _, label_dir = self.get_split_dirs(split)
+                image_dir, label_dir = self.get_split_dirs(split)
 
-            if not label_dir.is_dir():
+            if not image_dir.is_dir():
                 continue
 
-            # Parse all label files
-            for txt_file in label_dir.glob("*.txt"):
+            # Iterate over images and read corresponding label files
+            for img_file in image_dir.iterdir():
+                if img_file.suffix.lower() not in image_extensions:
+                    continue
+
+                label_path = label_dir / (img_file.stem + ".txt")
+                if not label_path.is_file():
+                    continue
+
                 try:
-                    with open(txt_file, encoding="utf-8") as f:
+                    with open(label_path, encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             if not line:
@@ -421,8 +430,9 @@ class YOLODataset(Dataset):
     def get_image_counts(self) -> dict[str, dict[str, int]]:
         """Get image counts per split, including background images.
 
-        For detection/segmentation: Counts label files in labels/{split}/*.txt.
-        Empty files are counted as background images.
+        For detection/segmentation: Scans the images directory and derives
+        the label path for each image.  Images whose label file is missing
+        or empty are counted as background, matching ultralytics behaviour.
 
         For classification: Counts total images across all class directories.
         Background count is always 0 (no background concept in classification).
@@ -434,39 +444,48 @@ class YOLODataset(Dataset):
         if self.task == TaskType.CLASSIFICATION:
             return self._get_classification_image_counts()
 
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         counts: dict[str, dict[str, int]] = {}
 
-        has_split_label_dirs = (
-            any(self.get_split_dirs(s)[1].is_dir() for s in self.splits)
+        has_split_image_dirs = (
+            any(self.get_split_dirs(s)[0].is_dir() for s in self.splits)
             if self.splits
             else False
         )
 
-        # If splits are declared but no labels/{split} folders exist, treat as unsplit.
-        if self.splits and not has_split_label_dirs:
+        # If splits are declared but no images/{split} folders exist, treat as unsplit.
+        if self.splits and not has_split_image_dirs:
             splits_to_process = ["unsplit"]
         else:
             splits_to_process = self.splits if self.splits else ["unsplit"]
 
         for split in splits_to_process:
             if split == "unsplit":
+                image_dir = self.path / "images"
                 label_dir = self.path / "labels"
             else:
-                _, label_dir = self.get_split_dirs(split)
+                image_dir, label_dir = self.get_split_dirs(split)
 
-            if not label_dir.is_dir():
+            if not image_dir.is_dir():
                 continue
 
             total = 0
             background = 0
-            for txt_file in label_dir.glob("*.txt"):
+            for img_file in image_dir.iterdir():
+                if img_file.suffix.lower() not in image_extensions:
+                    continue
+
                 total += 1
+                label_path = label_dir / (img_file.stem + ".txt")
+                if not label_path.is_file():
+                    background += 1
+                    continue
                 try:
-                    content = txt_file.read_text(encoding="utf-8").strip()
+                    content = label_path.read_text(encoding="utf-8").strip()
                     if not content:
                         background += 1
                 except OSError:
-                    continue
+                    background += 1
 
             counts[split] = {"total": total, "background": background}
 
