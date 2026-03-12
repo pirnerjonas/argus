@@ -10,7 +10,7 @@ from argus.commands.split_command import split_dataset
 from argus.commands.stats_command import stats
 from argus.commands.unsplit_command import unsplit_dataset
 from argus.commands.view_command import view
-from argus.discovery import _detect_dataset, _discover_datasets
+from argus.discovery import _detect_dataset, _discover_datasets, _probe_directory
 from argus.rendering import _draw_annotations, _generate_class_colors
 from argus.viewers import _ClassificationGridViewer, _ImageViewer, _MaskViewer
 
@@ -48,6 +48,7 @@ __all__ = [
     "filter_dataset",
     "_discover_datasets",
     "_detect_dataset",
+    "_probe_directory",
     "_generate_class_colors",
     "_draw_annotations",
     "_ImageViewer",

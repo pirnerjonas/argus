@@ -9,6 +9,7 @@ import numpy as np
 import yaml
 
 from argus.core.base import IMAGE_EXTENSIONS, Dataset, DatasetFormat, TaskType
+from argus.core.probe import FormatProbe
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +113,7 @@ class MaskDataset(Dataset):
 
             # RGB masks require configuration
             if is_rgb and not class_config:
-                raise ConfigurationError(
-                    f"RGB palette masks detected in {path} but no classes.yaml found. "
-                    "RGB masks require a classes.yaml config file with palette mapping."
-                )
+                return None
 
             # Build class mapping
             class_mapping, ignore_idx = cls._build_class_mapping(
@@ -144,6 +142,89 @@ class MaskDataset(Dataset):
             dataset._is_rgb_palette = is_rgb
 
             return dataset
+
+        return None
+
+    @classmethod
+    def probe(cls, path: Path) -> FormatProbe | None:
+        """Probe for partial mask dataset evidence.
+
+        Returns a FormatProbe when there's partial evidence of a mask dataset,
+        or None when there's no evidence at all.
+        """
+        path = Path(path)
+        if not path.is_dir():
+            return None
+
+        for images_name, masks_name in DIRECTORY_PATTERNS:
+            images_root = path / images_name
+            masks_root = path / masks_name
+
+            images_exists = images_root.is_dir()
+            masks_exists = masks_root.is_dir()
+
+            # Case 1: One half of directory pair exists
+            if images_exists and not masks_exists:
+                return FormatProbe(
+                    path=path,
+                    format="mask",
+                    evidence_found=[f"found {images_name}/ directory"],
+                    evidence_missing=[f"no {masks_name}/ directory"],
+                    confidence="strong",
+                )
+            if masks_exists and not images_exists:
+                return FormatProbe(
+                    path=path,
+                    format="mask",
+                    evidence_found=[f"found {masks_name}/ directory"],
+                    evidence_missing=[f"no {images_name}/ directory"],
+                    confidence="strong",
+                )
+
+            if not (images_exists and masks_exists):
+                continue
+
+            # Both dirs exist — check for RGB masks without classes.yaml
+            splits = cls._detect_splits(images_root, masks_root)
+            is_rgb, _ = cls._detect_mask_type(path, masks_root, splits)
+            class_config = cls._load_class_config(path)
+
+            if is_rgb and not class_config:
+                return FormatProbe(
+                    path=path,
+                    format="mask",
+                    evidence_found=[
+                        f"found {images_name}/ and {masks_name}/ directories",
+                        "RGB palette masks detected",
+                    ],
+                    evidence_missing=["no classes.yaml config file"],
+                    confidence="strong",
+                )
+
+            # Case 3: Directory pair exists but no actual files inside
+            if not splits:
+                has_images = any(
+                    f.suffix.lower() in IMAGE_EXTENSIONS for f in images_root.iterdir()
+                )
+                has_masks = any(
+                    f.suffix.lower() == ".png" for f in masks_root.iterdir()
+                )
+                if not has_images or not has_masks:
+                    found = []
+                    missing = []
+                    found.append(f"found {images_name}/ and {masks_name}/ directories")
+                    if not has_images:
+                        missing.append(f"no image files in {images_name}/")
+                    if not has_masks:
+                        missing.append(f"no mask files in {masks_name}/")
+                    if missing:
+                        return FormatProbe(
+                            path=path,
+                            format="mask",
+                            evidence_found=found,
+                            evidence_missing=missing,
+                            confidence="weak",
+                        )
 
         return None
 

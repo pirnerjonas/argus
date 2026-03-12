@@ -15,6 +15,7 @@ from rich.progress import (
 from argus.cli_common import console
 from argus.commands._utils import (
     _ensure_output_directory_empty,
+    _print_probes,
     _resolve_existing_directory,
     _resolve_output_path,
 )
@@ -140,11 +141,16 @@ def _convert_mask_to_yolo(
 
     dataset = MaskDataset.detect(input_path)
     if not dataset:
-        console.print(
-            f"[red]Error: No MaskDataset found at {input_path}[/red]\n"
-            "[yellow]Ensure the path contains images/ + masks/ directories "
-            "(or equivalent patterns like img/+gt/ or leftImg8bit/+gtFine/).[/yellow]"
-        )
+        console.print(f"[red]Error: No MaskDataset found at {input_path}[/red]")
+        probe = MaskDataset.probe(input_path)
+        if probe:
+            _print_probes([probe])
+        else:
+            console.print(
+                "[yellow]Ensure the path contains images/ + masks/ "
+                "directories (or equivalent patterns like "
+                "img/+gt/ or leftImg8bit/+gtFine/).[/yellow]"
+            )
         raise typer.Exit(1)
 
     console.print("[cyan]Converting MaskDataset to YOLO segmentation format[/cyan]")
@@ -205,11 +211,15 @@ def _convert_yolo_to_coco(
 
     yolo_dataset = YOLODataset.detect(input_path)
     if not yolo_dataset:
-        console.print(
-            f"[red]Error: No YOLO dataset found at {input_path}[/red]\n"
-            "[yellow]Ensure the path contains a data.yaml and images/labels "
-            "directories.[/yellow]"
-        )
+        console.print(f"[red]Error: No YOLO dataset found at {input_path}[/red]")
+        probe = YOLODataset.probe(input_path)
+        if probe:
+            _print_probes([probe])
+        else:
+            console.print(
+                "[yellow]Ensure the path contains a data.yaml and images/labels "
+                "directories.[/yellow]"
+            )
         raise typer.Exit(1)
 
     if yolo_dataset.task != TaskType.SEGMENTATION:

@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from argus.core.base import Dataset, DatasetFormat, TaskType
+from argus.core.probe import FormatProbe
 
 _ROBOFLOW_SPLIT_DIRS = {"train", "val", "valid", "test"}
 
@@ -80,6 +81,91 @@ class COCODataset(Dataset):
             result = cls._parse_annotation_file(path, ann_file, annotation_files)
             if result:
                 return result
+
+        return None
+
+    @classmethod
+    def probe(cls, path: Path) -> FormatProbe | None:
+        """Probe for partial COCO dataset evidence.
+
+        Returns a FormatProbe when there's partial evidence of a COCO dataset,
+        or None when there's no evidence at all.
+        """
+        path = Path(path)
+        if not path.is_dir():
+            return None
+
+        # Look for JSON files in annotations/ or split dirs
+        annotation_files = cls._find_annotation_files(path)
+        if not annotation_files:
+            return None
+
+        for ann_file in annotation_files:
+            try:
+                with open(ann_file, encoding="utf-8") as f:
+                    data = json.load(f)
+
+                if not isinstance(data, dict):
+                    continue
+
+                required_keys = ["images", "annotations", "categories"]
+                present_keys = [k for k in required_keys if k in data]
+                missing_keys = [k for k in required_keys if k not in data]
+
+                # Case 1: Has some COCO keys but missing others
+                if present_keys and missing_keys:
+                    return FormatProbe(
+                        path=path,
+                        format="coco",
+                        evidence_found=[
+                            f"found {ann_file.name} with {', '.join(present_keys)} keys"
+                        ],
+                        evidence_missing=[
+                            f"missing required keys: {', '.join(missing_keys)}"
+                        ],
+                        confidence="strong",
+                    )
+
+                # All keys present — check if values are lists
+                if not missing_keys:
+                    bad_types = [
+                        k for k in required_keys if not isinstance(data[k], list)
+                    ]
+                    if bad_types:
+                        return FormatProbe(
+                            path=path,
+                            format="coco",
+                            evidence_found=[
+                                f"found {ann_file.name} with all required keys"
+                            ],
+                            evidence_missing=[
+                                f"{', '.join(bad_types)} values are not lists"
+                            ],
+                            confidence="strong",
+                        )
+
+                    # Case 3: Valid annotation but image dirs don't exist
+                    images_dir = path / "images"
+                    if not images_dir.is_dir():
+                        # Check if images are colocated (Roboflow style)
+                        images = data.get("images", [])
+                        if images and isinstance(images[0], dict):
+                            file_name = images[0].get("file_name", "")
+                            if file_name and not (ann_file.parent / file_name).exists():
+                                return FormatProbe(
+                                    path=path,
+                                    format="coco",
+                                    evidence_found=[
+                                        f"found valid annotation {ann_file.name}"
+                                    ],
+                                    evidence_missing=[
+                                        "referenced image files not found"
+                                    ],
+                                    confidence="weak",
+                                )
+
+            except (json.JSONDecodeError, OSError):
+                continue
 
         return None
 

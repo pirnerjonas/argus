@@ -18,6 +18,7 @@ from argus.core.filter import (
     filter_yolo_dataset,
 )
 from argus.core.mask import ConfigurationError, MaskDataset
+from argus.core.probe import FormatProbe
 from argus.core.split import (
     split_coco_dataset,
     split_mask_dataset,
@@ -36,6 +37,7 @@ __all__ = [
     "COCOLayout",
     "MaskDataset",
     "ConfigurationError",
+    "FormatProbe",
     "split_coco_dataset",
     "split_mask_dataset",
     "split_yolo_dataset",

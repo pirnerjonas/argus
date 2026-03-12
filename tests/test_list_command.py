@@ -6,8 +6,9 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from argus.cli import _discover_datasets, app
-from argus.core import COCODataset, YOLODataset
+from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import DatasetFormat, TaskType
+from argus.discovery import _probe_directory
 
 # Set terminal width to prevent Rich from truncating output in CI
 os.environ["COLUMNS"] = "200"
@@ -315,3 +316,153 @@ class TestDatasetSummary:
         assert summary["task"] == "detection"
         assert summary["classes"] == 2
         assert "train" in summary["splits"]
+
+
+class TestFormatProbe:
+    """Tests for format probe diagnostics."""
+
+    def test_yolo_probe_missing_names(self, yolo_missing_names: Path):
+        """Test YOLO probe detects YAML with path/train/val but no names."""
+        probe = YOLODataset.probe(yolo_missing_names)
+
+        assert probe is not None
+        assert probe.format == "yolo"
+        assert probe.confidence == "strong"
+        assert any("names" in m for m in probe.evidence_missing)
+        assert any("data.yaml" in f for f in probe.evidence_found)
+
+    def test_yolo_probe_labels_no_images(self, yolo_labels_no_images: Path):
+        """Test YOLO probe detects labels/ without images/."""
+        probe = YOLODataset.probe(yolo_labels_no_images)
+
+        assert probe is not None
+        assert probe.format == "yolo"
+        assert probe.confidence == "strong"
+        assert any("labels/" in f for f in probe.evidence_found)
+        assert any("images/" in m for m in probe.evidence_missing)
+
+    def test_coco_probe_missing_keys(self, coco_missing_keys: Path):
+        """Test COCO probe detects JSON with some but not all required keys."""
+        probe = COCODataset.probe(coco_missing_keys)
+
+        assert probe is not None
+        assert probe.format == "coco"
+        assert probe.confidence == "strong"
+        assert any("categories" in m for m in probe.evidence_missing)
+
+    def test_mask_probe_half_pair(self, mask_half_pair: Path):
+        """Test mask probe detects images/ without masks/."""
+        probe = MaskDataset.probe(mask_half_pair)
+
+        assert probe is not None
+        assert probe.format == "mask"
+        assert probe.confidence == "strong"
+        assert any("images" in f for f in probe.evidence_found)
+        assert any("masks" in m for m in probe.evidence_missing)
+
+    def test_mask_probe_rgb_no_config(self, mask_rgb_no_config: Path):
+        """Test mask probe detects RGB masks without classes.yaml."""
+        probe = MaskDataset.probe(mask_rgb_no_config)
+
+        assert probe is not None
+        assert probe.format == "mask"
+        assert probe.confidence == "strong"
+        assert any("RGB" in f for f in probe.evidence_found)
+        assert any("classes.yaml" in m for m in probe.evidence_missing)
+
+    def test_yolo_probe_returns_none_on_empty(self, empty_directory: Path):
+        """Test YOLO probe returns None for empty directories."""
+        assert YOLODataset.probe(empty_directory) is None
+
+    def test_coco_probe_returns_none_on_empty(self, empty_directory: Path):
+        """Test COCO probe returns None for empty directories."""
+        assert COCODataset.probe(empty_directory) is None
+
+    def test_mask_probe_returns_none_on_empty(self, empty_directory: Path):
+        """Test mask probe returns None for empty directories."""
+        assert MaskDataset.probe(empty_directory) is None
+
+    def test_yolo_probe_returns_none_on_random(self, random_files_directory: Path):
+        """Test YOLO probe returns None for random files."""
+        assert YOLODataset.probe(random_files_directory) is None
+
+    def test_coco_probe_returns_none_on_random(self, random_files_directory: Path):
+        """Test COCO probe returns None for random files."""
+        assert COCODataset.probe(random_files_directory) is None
+
+    def test_mask_probe_returns_none_on_random(self, random_files_directory: Path):
+        """Test mask probe returns None for random files."""
+        assert MaskDataset.probe(random_files_directory) is None
+
+    def test_probe_message_format(self, yolo_missing_names: Path):
+        """Test that probe message is properly formatted."""
+        probe = YOLODataset.probe(yolo_missing_names)
+        assert probe is not None
+        msg = probe.message
+        assert "looks like YOLO" in msg
+        assert "but" in msg
+
+    def test_probe_directory_aggregates(self, yolo_missing_names: Path):
+        """Test _probe_directory returns probes from all formats."""
+        probes = _probe_directory(yolo_missing_names)
+        # At minimum the YOLO probe should fire
+        assert len(probes) >= 1
+        assert any(p.format == "yolo" for p in probes)
+
+
+class TestDiagnostics:
+    """Tests for diagnostic output in CLI commands."""
+
+    def test_list_diagnostics_flag_shows_probes(self, yolo_missing_names: Path):
+        """Test list --diagnostics shows near-miss warnings."""
+        result = runner.invoke(
+            app,
+            ["list", "--path", str(yolo_missing_names), "--diagnostics"],
+        )
+        assert "Diagnostics" in result.stdout
+        assert "looks like YOLO" in result.stdout
+
+    def test_list_without_diagnostics_hides_probes(self, yolo_missing_names: Path):
+        """Test list without --diagnostics does NOT show diagnostics."""
+        result = runner.invoke(
+            app,
+            ["list", "--path", str(yolo_missing_names)],
+        )
+        assert "Diagnostics" not in result.stdout
+        assert "looks like YOLO" not in result.stdout
+
+    def test_list_diagnostics_short_flag(self, yolo_missing_names: Path):
+        """Test list --diag short flag works."""
+        result = runner.invoke(
+            app,
+            ["list", "--path", str(yolo_missing_names), "--diag"],
+        )
+        assert "Diagnostics" in result.stdout
+
+    def test_stats_shows_probes_on_failure(self, yolo_missing_names: Path):
+        """Test stats command shows probes when detection fails."""
+        result = runner.invoke(app, ["stats", str(yolo_missing_names)])
+        assert result.exit_code == 1
+        assert "looks like YOLO" in result.stdout
+
+    def test_stats_no_probes_on_success(self, yolo_detection_dataset: Path):
+        """Test stats command doesn't show probes for valid datasets."""
+        result = runner.invoke(app, ["stats", str(yolo_detection_dataset)])
+        assert result.exit_code == 0
+        assert "looks like" not in result.stdout
+
+    def test_diagnostics_not_shown_for_valid_dataset(
+        self, yolo_detection_dataset: Path
+    ):
+        """Test --diagnostics doesn't show probes for valid datasets."""
+        result = runner.invoke(
+            app,
+            ["list", "--path", str(yolo_detection_dataset), "--diagnostics"],
+        )
+        assert result.exit_code == 0
+        assert "Diagnostics" not in result.stdout
+
+    def test_mask_detect_no_crash_on_rgb_without_config(self, mask_rgb_no_config: Path):
+        """MaskDataset.detect() returns None for RGB without config."""
+        dataset = MaskDataset.detect(mask_rgb_no_config)
+        assert dataset is None

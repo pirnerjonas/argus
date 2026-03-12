@@ -1,16 +1,25 @@
 """Dataset discovery helpers for the CLI."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from argus.core import COCODataset, Dataset, MaskDataset, YOLODataset
+from argus.core.probe import FormatProbe
 
 
-def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:
+def _discover_datasets(
+    root_path: Path,
+    max_depth: int,
+    probes: list[FormatProbe] | None = None,
+) -> list[Dataset]:
     """Discover all datasets under the root path.
 
     Args:
         root_path: Root directory to search.
         max_depth: Maximum depth to traverse.
+        probes: Optional list to collect diagnostic probes into. When provided,
+            directories where detection fails are probed for partial evidence.
 
     Returns:
         List of discovered Dataset instances.
@@ -40,6 +49,11 @@ def _discover_datasets(root_path: Path, max_depth: int) -> list[Dataset]:
                 datasets.append(dataset)
             # Don't recurse into detected datasets to avoid duplicates
             return
+
+        # Collect probes if requested
+        if probes is not None:
+            dir_probes = _probe_directory(current_path)
+            probes.extend(dir_probes)
 
         # Recurse into subdirectories
         try:
@@ -78,3 +92,20 @@ def _detect_dataset(path: Path) -> Dataset | None:
         return dataset
 
     return None
+
+
+def _probe_directory(path: Path) -> list[FormatProbe]:
+    """Probe a directory for partial dataset evidence.
+
+    Args:
+        path: Directory to probe.
+
+    Returns:
+        List of FormatProbe results (one per format with evidence).
+    """
+    probes = []
+    for cls in (YOLODataset, COCODataset, MaskDataset):
+        probe = cls.probe(path)
+        if probe:
+            probes.append(probe)
+    return probes
