@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from argus.core.base import Dataset, DatasetFormat, TaskType
+from argus.core.base import IMAGE_EXTENSIONS, Dataset, DatasetFormat, TaskType
 
 
 @dataclass
@@ -150,7 +150,6 @@ class YOLODataset(Dataset):
         Returns:
             YOLODataset if classification structure found, None otherwise.
         """
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 
         # Try split structure first: images/{split}/class/
         images_root = path / "images"
@@ -172,7 +171,7 @@ class YOLODataset(Dataset):
                 has_images = False
                 for class_dir in class_dirs:
                     for f in class_dir.iterdir():
-                        if f.suffix.lower() in image_extensions:
+                        if f.suffix.lower() in IMAGE_EXTENSIONS:
                             has_images = True
                             break
                     if has_images:
@@ -214,7 +213,7 @@ class YOLODataset(Dataset):
         class_names_set = set()
         for class_dir in class_dirs:
             has_images = any(
-                f.suffix.lower() in image_extensions
+                f.suffix.lower() in IMAGE_EXTENSIONS
                 for f in class_dir.iterdir()
                 if f.is_file()
             )
@@ -309,7 +308,6 @@ class YOLODataset(Dataset):
         if self.task == TaskType.CLASSIFICATION:
             return self._get_classification_instance_counts()
 
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         counts: dict[str, dict[str, int]] = {}
 
         # Build class_id -> class_name mapping
@@ -342,7 +340,7 @@ class YOLODataset(Dataset):
 
             # Iterate over images and read corresponding label files
             for img_file in image_dir.iterdir():
-                if img_file.suffix.lower() not in image_extensions:
+                if img_file.suffix.lower() not in IMAGE_EXTENSIONS:
                     continue
 
                 label_path = label_dir / (img_file.stem + ".txt")
@@ -381,7 +379,6 @@ class YOLODataset(Dataset):
             Dictionary mapping split name to dict of class name to image count.
         """
         counts: dict[str, dict[str, int]] = {}
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 
         # Handle flat structure (no splits)
         if not self.splits:
@@ -395,7 +392,7 @@ class YOLODataset(Dataset):
                 image_count = sum(
                     1
                     for f in class_dir.iterdir()
-                    if f.suffix.lower() in image_extensions
+                    if f.suffix.lower() in IMAGE_EXTENSIONS
                 )
                 split_counts[class_name] = image_count
 
@@ -419,7 +416,7 @@ class YOLODataset(Dataset):
                 image_count = sum(
                     1
                     for f in class_dir.iterdir()
-                    if f.suffix.lower() in image_extensions
+                    if f.suffix.lower() in IMAGE_EXTENSIONS
                 )
                 split_counts[class_name] = image_count
 
@@ -444,7 +441,6 @@ class YOLODataset(Dataset):
         if self.task == TaskType.CLASSIFICATION:
             return self._get_classification_image_counts()
 
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         counts: dict[str, dict[str, int]] = {}
 
         has_split_image_dirs = (
@@ -472,7 +468,7 @@ class YOLODataset(Dataset):
             total = 0
             background = 0
             for img_file in image_dir.iterdir():
-                if img_file.suffix.lower() not in image_extensions:
+                if img_file.suffix.lower() not in IMAGE_EXTENSIONS:
                     continue
 
                 total += 1
@@ -499,7 +495,6 @@ class YOLODataset(Dataset):
             Background is always 0 for classification.
         """
         counts: dict[str, dict[str, int]] = {}
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 
         # Handle flat structure (no splits)
         if not self.splits:
@@ -512,7 +507,7 @@ class YOLODataset(Dataset):
                 total += sum(
                     1
                     for f in class_dir.iterdir()
-                    if f.suffix.lower() in image_extensions
+                    if f.suffix.lower() in IMAGE_EXTENSIONS
                 )
 
             counts["unsplit"] = {"total": total, "background": 0}
@@ -534,7 +529,7 @@ class YOLODataset(Dataset):
                 total += sum(
                     1
                     for f in class_dir.iterdir()
-                    if f.suffix.lower() in image_extensions
+                    if f.suffix.lower() in IMAGE_EXTENSIONS
                 )
 
             counts[split] = {"total": total, "background": 0}
@@ -692,7 +687,6 @@ class YOLODataset(Dataset):
         if self.task == TaskType.CLASSIFICATION:
             return self._get_classification_image_paths(split)
 
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         images_root = self.path / "images"
         image_paths: list[Path] = []
         seen: set[Path] = set()
@@ -728,7 +722,7 @@ class YOLODataset(Dataset):
                 continue
 
             for img_file in image_dir.iterdir():
-                if img_file.suffix.lower() not in image_extensions:
+                if img_file.suffix.lower() not in IMAGE_EXTENSIONS:
                     continue
 
                 resolved = img_file.resolve()
@@ -748,7 +742,7 @@ class YOLODataset(Dataset):
         Returns:
             List of image file paths sorted alphabetically.
         """
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+
         image_paths: list[Path] = []
 
         # Handle flat structure (no splits)
@@ -759,7 +753,7 @@ class YOLODataset(Dataset):
                     continue
 
                 for img_file in class_dir.iterdir():
-                    if img_file.suffix.lower() in image_extensions:
+                    if img_file.suffix.lower() in IMAGE_EXTENSIONS:
                         image_paths.append(img_file)
 
             return sorted(image_paths, key=lambda p: p.name)
@@ -779,7 +773,7 @@ class YOLODataset(Dataset):
                     continue
 
                 for img_file in class_dir.iterdir():
-                    if img_file.suffix.lower() in image_extensions:
+                    if img_file.suffix.lower() in IMAGE_EXTENSIONS:
                         image_paths.append(img_file)
 
         return sorted(image_paths, key=lambda p: p.name)
@@ -902,7 +896,6 @@ class YOLODataset(Dataset):
         if self.task != TaskType.CLASSIFICATION:
             return {}
 
-        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
         images_by_class: dict[str, list[Path]] = {cls: [] for cls in self.class_names}
 
         # Handle flat structure (no splits)
@@ -913,7 +906,7 @@ class YOLODataset(Dataset):
                     continue
 
                 for img_file in class_dir.iterdir():
-                    if img_file.suffix.lower() in image_extensions:
+                    if img_file.suffix.lower() in IMAGE_EXTENSIONS:
                         images_by_class[class_name].append(img_file)
 
             # Sort images within each class
@@ -940,7 +933,7 @@ class YOLODataset(Dataset):
                     continue
 
                 for img_file in class_dir.iterdir():
-                    if img_file.suffix.lower() in image_extensions:
+                    if img_file.suffix.lower() in IMAGE_EXTENSIONS:
                         images_by_class[class_name].append(img_file)
 
         # Sort images within each class for consistent ordering

@@ -14,6 +14,86 @@ os.environ["COLUMNS"] = "200"
 runner = CliRunner()
 
 
+class TestYOLODatasetDetection:
+    """Tests for YOLO dataset detection."""
+
+    def test_detect_yolo_detection_dataset(self, yolo_detection_dataset: Path):
+        """Test detection of valid YOLO detection dataset."""
+        dataset = YOLODataset.detect(yolo_detection_dataset)
+
+        assert dataset is not None
+        assert dataset.format == DatasetFormat.YOLO
+        assert dataset.task == TaskType.DETECTION
+        assert dataset.num_classes == 3
+        assert dataset.class_names == ["person", "car", "bicycle"]
+        assert "train" in dataset.splits
+        assert "val" in dataset.splits
+
+    def test_detect_yolo_segmentation_dataset(self, yolo_segmentation_dataset: Path):
+        """Test detection of valid YOLO segmentation dataset."""
+        dataset = YOLODataset.detect(yolo_segmentation_dataset)
+
+        assert dataset is not None
+        assert dataset.format == DatasetFormat.YOLO
+        assert dataset.task == TaskType.SEGMENTATION
+        assert dataset.num_classes == 2
+        assert dataset.class_names == ["cat", "dog"]
+        assert "train" in dataset.splits
+        assert "val" in dataset.splits
+
+    def test_detect_yolo_flat_structure(self, yolo_flat_structure_dataset: Path):
+        """Test detection of YOLO dataset with flat structure."""
+        dataset = YOLODataset.detect(yolo_flat_structure_dataset)
+
+        assert dataset is not None
+        assert dataset.format == DatasetFormat.YOLO
+        assert dataset.task == TaskType.DETECTION
+        assert dataset.num_classes == 2
+
+    def test_detect_invalid_yaml_missing_names(self, invalid_yaml_missing_names: Path):
+        """Test that YAML without 'names' is not detected as YOLO."""
+        dataset = YOLODataset.detect(invalid_yaml_missing_names)
+        assert dataset is None
+
+    def test_detect_empty_directory(self, empty_directory: Path):
+        """Test that empty directory is not detected as YOLO."""
+        dataset = YOLODataset.detect(empty_directory)
+        assert dataset is None
+
+    def test_detect_random_files(self, random_files_directory: Path):
+        """Test that random files are not detected as YOLO."""
+        dataset = YOLODataset.detect(random_files_directory)
+        assert dataset is None
+
+    def test_detect_nonexistent_path(self, tmp_path: Path):
+        """Test that nonexistent path returns None."""
+        dataset = YOLODataset.detect(tmp_path / "nonexistent")
+        assert dataset is None
+
+    def test_yolo_cls_rejects_dirs_with_coco_json(self, tmp_path: Path):
+        """Test that YOLO classification rejects directories with COCO JSON files."""
+        dataset_path = tmp_path / "fake_cls"
+        dataset_path.mkdir()
+
+        # Create directories that look like classes but contain COCO JSON
+        import json
+
+        for name in ["train", "valid"]:
+            d = dataset_path / name
+            d.mkdir()
+            (d / "img.jpg").write_bytes(b"fake image")
+            coco_data = {
+                "images": [{"id": 1, "file_name": "img.jpg"}],
+                "annotations": [{"id": 1, "image_id": 1}],
+                "categories": [{"id": 1, "name": "obj"}],
+            }
+            (d / "_annotations.coco.json").write_text(json.dumps(coco_data))
+
+        # Should NOT be detected as YOLO classification
+        dataset = YOLODataset.detect(dataset_path)
+        assert dataset is None
+
+
 class TestCOCODatasetDetection:
     """Tests for COCO dataset detection."""
 

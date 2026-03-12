@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import yaml
 
-from argus.core.base import Dataset, DatasetFormat, TaskType
+from argus.core.base import IMAGE_EXTENSIONS, Dataset, DatasetFormat, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,6 @@ DIRECTORY_PATTERNS = [
     ("img", "gt"),
     ("leftImg8bit", "gtFine"),
 ]
-
-# Standard image extensions
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 
 
 @dataclass
