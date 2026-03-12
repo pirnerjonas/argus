@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 
@@ -1129,9 +1131,6 @@ def yolo_real_detection_dataset(tmp_path: Path) -> Path:
         - val/img005: 1 annotation  (class 2)
         - val/img006: empty label file (background)
     """
-    import cv2
-    import numpy as np
-
     dataset_path = tmp_path / "yolo_real_det"
     dataset_path.mkdir()
 
@@ -1187,9 +1186,6 @@ def yolo_real_segmentation_dataset(tmp_path: Path) -> Path:
 
     Includes polygon labels (>5 columns per line).
     """
-    import cv2
-    import numpy as np
-
     dataset_path = tmp_path / "yolo_real_seg"
     dataset_path.mkdir()
 
@@ -1229,3 +1225,340 @@ def yolo_real_segmentation_dataset(tmp_path: Path) -> Path:
     )
 
     return dataset_path
+
+
+# ---------------------------------------------------------------------------
+# Real-image COCO fixtures for ground truth cross-validation tests
+# ---------------------------------------------------------------------------
+
+
+def _write_real_image(path: Path, width: int = 100, height: int = 100) -> None:
+    """Write a real JPEG image using cv2."""
+    img = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
+    cv2.imwrite(str(path), img)
+
+
+@pytest.fixture
+def coco_real_detection_dataset(tmp_path: Path) -> Path:
+    """COCO detection dataset with real images and background images.
+
+    Train: 3 images (img001 annotated, img002 annotated, img003 background)
+    Val:   2 images (img004 annotated, img005 background)
+    Categories: person(1), car(2), bicycle(3)
+    """
+    ds = tmp_path / "coco_real_det"
+    ds.mkdir()
+    (ds / "annotations").mkdir()
+    (ds / "images" / "train").mkdir(parents=True)
+    (ds / "images" / "val").mkdir(parents=True)
+
+    for name in ["img001.jpg", "img002.jpg", "img003.jpg"]:
+        _write_real_image(ds / "images" / "train" / name)
+    for name in ["img004.jpg", "img005.jpg"]:
+        _write_real_image(ds / "images" / "val" / name)
+
+    categories = [
+        {"id": 1, "name": "person", "supercategory": "human"},
+        {"id": 2, "name": "car", "supercategory": "vehicle"},
+        {"id": 3, "name": "bicycle", "supercategory": "vehicle"},
+    ]
+
+    train_data = {
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+            {"id": 2, "file_name": "img002.jpg", "width": 100, "height": 100},
+            {"id": 3, "file_name": "img003.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [10, 10, 30, 30],
+                "area": 900,
+                "iscrowd": 0,
+            },
+            {
+                "id": 2,
+                "image_id": 1,
+                "category_id": 2,
+                "bbox": [50, 50, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 3,
+                "image_id": 2,
+                "category_id": 1,
+                "bbox": [5, 5, 40, 40],
+                "area": 1600,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+
+    val_data = {
+        "images": [
+            {"id": 4, "file_name": "img004.jpg", "width": 100, "height": 100},
+            {"id": 5, "file_name": "img005.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 4,
+                "image_id": 4,
+                "category_id": 3,
+                "bbox": [20, 20, 10, 10],
+                "area": 100,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+
+    (ds / "annotations" / "instances_train.json").write_text(json.dumps(train_data))
+    (ds / "annotations" / "instances_val.json").write_text(json.dumps(val_data))
+
+    return ds
+
+
+@pytest.fixture
+def coco_real_segmentation_dataset(tmp_path: Path) -> Path:
+    """COCO segmentation dataset with polygon annotations.
+
+    Train: 1 image, 1 polygon annotation (cat)
+    Val:   1 image, 2 polygon annotations (cat, dog)
+    Categories: cat(1), dog(2)
+    """
+    ds = tmp_path / "coco_real_seg"
+    ds.mkdir()
+    (ds / "annotations").mkdir()
+    (ds / "images" / "train").mkdir(parents=True)
+    (ds / "images" / "val").mkdir(parents=True)
+
+    _write_real_image(ds / "images" / "train" / "img001.jpg")
+    _write_real_image(ds / "images" / "val" / "img002.jpg")
+
+    categories = [
+        {"id": 1, "name": "cat", "supercategory": "animal"},
+        {"id": 2, "name": "dog", "supercategory": "animal"},
+    ]
+
+    train_data = {
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [10, 10, 30, 30],
+                "segmentation": [[10, 10, 40, 10, 40, 40, 10, 40]],
+                "area": 900,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+
+    val_data = {
+        "images": [
+            {"id": 2, "file_name": "img002.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 2,
+                "image_id": 2,
+                "category_id": 1,
+                "bbox": [5, 5, 20, 20],
+                "segmentation": [[5, 5, 25, 5, 25, 25, 5, 25]],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 3,
+                "image_id": 2,
+                "category_id": 2,
+                "bbox": [60, 60, 15, 15],
+                "segmentation": [[60, 60, 75, 60, 75, 75, 60, 75]],
+                "area": 225,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+
+    (ds / "annotations" / "instances_train.json").write_text(json.dumps(train_data))
+    (ds / "annotations" / "instances_val.json").write_text(json.dumps(val_data))
+
+    return ds
+
+
+@pytest.fixture
+def coco_real_roboflow_dataset(tmp_path: Path) -> Path:
+    """Roboflow COCO layout with per-split annotation files.
+
+    train: 2 images (both annotated)
+    valid: 1 image (annotated)
+    test:  1 image (background — no annotations)
+    Categories: person(1), car(2)
+    """
+    ds = tmp_path / "coco_real_rf"
+    ds.mkdir()
+
+    categories = [
+        {"id": 1, "name": "person", "supercategory": "human"},
+        {"id": 2, "name": "car", "supercategory": "vehicle"},
+    ]
+
+    # Train
+    (ds / "train").mkdir()
+    _write_real_image(ds / "train" / "img001.jpg")
+    _write_real_image(ds / "train" / "img002.jpg")
+    train_data = {
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+            {"id": 2, "file_name": "img002.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [10, 10, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 2,
+                "image_id": 2,
+                "category_id": 2,
+                "bbox": [30, 30, 25, 25],
+                "area": 625,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+    (ds / "train" / "_annotations.coco.json").write_text(json.dumps(train_data))
+
+    # Valid
+    (ds / "valid").mkdir()
+    _write_real_image(ds / "valid" / "img003.jpg")
+    valid_data = {
+        "images": [
+            {"id": 3, "file_name": "img003.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 3,
+                "image_id": 3,
+                "category_id": 1,
+                "bbox": [15, 15, 30, 30],
+                "area": 900,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": categories,
+    }
+    (ds / "valid" / "_annotations.coco.json").write_text(json.dumps(valid_data))
+
+    # Test (background image)
+    (ds / "test").mkdir()
+    _write_real_image(ds / "test" / "img004.jpg")
+    test_data = {
+        "images": [
+            {"id": 4, "file_name": "img004.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [],
+        "categories": categories,
+    }
+    (ds / "test" / "_annotations.coco.json").write_text(json.dumps(test_data))
+
+    return ds
+
+
+@pytest.fixture
+def coco_real_unsplit_dataset(tmp_path: Path) -> Path:
+    """COCO dataset with a single unsplit annotation file.
+
+    2 images: img001 annotated, img002 background
+    Category: obj(1)
+    """
+    ds = tmp_path / "coco_real_unsplit"
+    ds.mkdir()
+    (ds / "annotations").mkdir()
+    (ds / "images").mkdir()
+
+    _write_real_image(ds / "images" / "img001.jpg")
+    _write_real_image(ds / "images" / "img002.jpg")
+
+    data = {
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+            {"id": 2, "file_name": "img002.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [10, 10, 50, 50],
+                "area": 2500,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": [
+            {"id": 1, "name": "obj", "supercategory": "thing"},
+        ],
+    }
+    (ds / "annotations" / "annotations.json").write_text(json.dumps(data))
+
+    return ds
+
+
+@pytest.fixture
+def coco_real_cat_zero_dataset(tmp_path: Path) -> Path:
+    """COCO dataset where category ID 0 is used.
+
+    1 image, 2 annotations: alpha(0), beta(1)
+    Tests has_cat_zero detection.
+    """
+    ds = tmp_path / "coco_real_cat0"
+    ds.mkdir()
+    (ds / "annotations").mkdir()
+    (ds / "images" / "train").mkdir(parents=True)
+
+    _write_real_image(ds / "images" / "train" / "img001.jpg")
+
+    data = {
+        "images": [
+            {"id": 1, "file_name": "img001.jpg", "width": 100, "height": 100},
+        ],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 0,
+                "bbox": [5, 5, 20, 20],
+                "area": 400,
+                "iscrowd": 0,
+            },
+            {
+                "id": 2,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [50, 50, 30, 30],
+                "area": 900,
+                "iscrowd": 0,
+            },
+        ],
+        "categories": [
+            {"id": 0, "name": "alpha", "supercategory": "thing"},
+            {"id": 1, "name": "beta", "supercategory": "thing"},
+        ],
+    }
+    (ds / "annotations" / "instances_train.json").write_text(json.dumps(data))
+
+    return ds
