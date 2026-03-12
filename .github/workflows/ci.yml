@@ -58,5 +58,5 @@ jobs:
 
       - name: Run integration tests
         run: |
-          uv sync --only-group dev --group integration
+          uv sync --group dev --group integration
           uv run pytest -m integration
