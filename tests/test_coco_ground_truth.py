@@ -203,6 +203,12 @@ class TestCategoryZero:
         ds = COCODataset.detect(coco_real_cat_zero_dataset)
         assert ds is not None
         assert ds.has_cat_zero is True
+        assert ds.ignore_index == 0
+
+    def test_cat_zero_not_detected_when_absent(self, coco_real_detection_dataset):
+        ds = COCODataset.detect(coco_real_detection_dataset)
+        assert ds is not None
+        assert ds.has_cat_zero is False
 
     def test_cat_zero_instance_counts_match(self, coco_real_cat_zero_dataset):
         ds = COCODataset.detect(coco_real_cat_zero_dataset)
@@ -212,6 +218,58 @@ class TestCategoryZero:
         )
         counts = ds.get_instance_counts()
         assert counts["train"] == gt["instance_counts"]
+
+    def test_cat_zero_class_mapping_shifted(self, coco_real_cat_zero_dataset):
+        """Class mapping shifts IDs by +1 when cat 0 exists."""
+        ds = COCODataset.detect(coco_real_cat_zero_dataset)
+        assert ds is not None
+        mapping = ds.get_class_mapping()
+        # Original IDs 0->alpha, 1->beta become 1->alpha, 2->beta
+        assert mapping == {1: "alpha", 2: "beta"}
+
+    def test_cat_zero_mask_values_shifted(self, tmp_path):
+        """Mask pixel values are shifted by +1 when cat 0 exists."""
+        import json
+
+        import cv2
+        import numpy as np
+
+        ds_path = tmp_path / "cat_zero_mask"
+        ds_path.mkdir()
+        ann_dir = ds_path / "annotations"
+        ann_dir.mkdir()
+        img_dir = ds_path / "images" / "train"
+        img_dir.mkdir(parents=True)
+
+        coco_data = {
+            "images": [
+                {"id": 1, "file_name": "img.jpg", "width": 10, "height": 10},
+            ],
+            "annotations": [
+                {
+                    "id": 1,
+                    "image_id": 1,
+                    "category_id": 0,
+                    "bbox": [0, 0, 5, 5],
+                    "segmentation": [[0, 0, 5, 0, 5, 5, 0, 5]],
+                },
+            ],
+            "categories": [{"id": 0, "name": "thing"}],
+        }
+        (ann_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+        img = np.zeros((10, 10, 3), dtype=np.uint8)
+        cv2.imwrite(str(img_dir / "img.jpg"), img)
+
+        ds = COCODataset.detect(ds_path)
+        assert ds is not None
+
+        mask = ds.load_mask(img_dir / "img.jpg")
+        assert mask is not None
+        # Category 0 should appear as 1 in the mask
+        assert (mask == 1).any()
+        # Background should be 0
+        assert (mask == 0).any()
 
 
 # ---------------------------------------------------------------------------
