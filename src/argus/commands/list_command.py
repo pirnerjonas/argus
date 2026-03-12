@@ -7,7 +7,8 @@ import typer
 from rich.table import Table
 
 from argus.cli_common import console
-from argus.commands._utils import _resolve_existing_directory
+from argus.commands._utils import _print_probes, _resolve_existing_directory
+from argus.core.probe import FormatProbe
 from argus.discovery import _discover_datasets
 
 
@@ -30,6 +31,15 @@ def list_datasets(
             max=10,
         ),
     ] = 3,
+    diagnostics: Annotated[
+        bool,
+        typer.Option(
+            "--diagnostics",
+            "--diag",
+            help="Show diagnostics for directories that look like "
+            "datasets but failed detection.",
+        ),
+    ] = False,
 ) -> None:
     """List all detected datasets in the specified path.
 
@@ -38,10 +48,15 @@ def list_datasets(
     """
     path = _resolve_existing_directory(path)
 
-    datasets = _discover_datasets(path, max_depth)
+    probes: list[FormatProbe] | None = [] if diagnostics else None
+    datasets = _discover_datasets(path, max_depth, probes=probes)
 
     if not datasets:
         console.print(f"[yellow]No datasets found in {path}[/yellow]")
+        if probes:
+            console.print()
+            console.print("[yellow]Diagnostics:[/yellow]")
+            _print_probes(probes)
         return
 
     # Create and populate table
@@ -64,3 +79,8 @@ def list_datasets(
 
     console.print(table)
     console.print(f"\n[green]Found {len(datasets)} dataset(s)[/green]")
+
+    if probes:
+        console.print()
+        console.print("[yellow]Diagnostics:[/yellow]")
+        _print_probes(probes)

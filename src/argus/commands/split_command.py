@@ -7,7 +7,11 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from argus.cli_common import console
-from argus.commands._utils import _resolve_existing_directory, _resolve_output_path
+from argus.commands._utils import (
+    _print_probes,
+    _resolve_existing_directory,
+    _resolve_output_path,
+)
 from argus.core import COCODataset, MaskDataset, YOLODataset
 from argus.core.base import Partitioning
 from argus.core.split import (
@@ -16,7 +20,7 @@ from argus.core.split import (
     split_mask_dataset,
     split_yolo_dataset,
 )
-from argus.discovery import _detect_dataset
+from argus.discovery import _detect_dataset, _probe_directory
 
 
 def split_dataset(
@@ -61,12 +65,16 @@ def split_dataset(
 
     detected_dataset = _detect_dataset(dataset_path)
     if not detected_dataset:
-        console.print(
-            f"[red]Error: No dataset found at {dataset_path}[/red]\n"
-            "[yellow]Ensure the path points to a dataset root containing "
-            "data.yaml (YOLO), annotations/ folder (COCO), or "
-            "images/ + masks/ directories (Mask).[/yellow]"
-        )
+        console.print(f"[red]Error: No dataset found at {dataset_path}[/red]")
+        probes = _probe_directory(dataset_path)
+        if probes:
+            _print_probes(probes)
+        else:
+            console.print(
+                "[yellow]Ensure the path points to a dataset root containing "
+                "data.yaml (YOLO), annotations/ folder (COCO), or "
+                "images/ + masks/ directories (Mask).[/yellow]"
+            )
         raise typer.Exit(1)
 
     try:

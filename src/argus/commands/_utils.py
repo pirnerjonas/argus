@@ -1,10 +1,13 @@
 """Shared helpers for CLI command modules."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 import typer
 
 from argus.cli_common import console
+from argus.core.probe import FormatProbe
 
 
 def _resolve_existing_directory(path: Path) -> Path:
@@ -24,6 +27,12 @@ def _resolve_output_path(output_path: Path, base_path: Path) -> Path:
     if not output_path.is_absolute():
         output_path = base_path / output_path
     return output_path.resolve()
+
+
+def _print_probes(probes: list[FormatProbe]) -> None:
+    """Print diagnostic probe results as warnings."""
+    for probe in probes:
+        console.print(f"  [yellow]\u26a0 {probe.path}: {probe.message}[/yellow]")
 
 
 def _ensure_output_directory_empty(output_path: Path) -> None:

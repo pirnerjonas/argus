@@ -1078,6 +1078,95 @@ def coco_relative_path_rle_dataset(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def yolo_missing_names(tmp_path: Path) -> Path:
+    """Create a near-miss YOLO dataset: YAML with path/train/val but no names."""
+    dataset_path = tmp_path / "yolo_missing_names"
+    dataset_path.mkdir()
+
+    yaml_content = "path: .\ntrain: images/train\nval: images/val\n"
+    (dataset_path / "data.yaml").write_text(yaml_content)
+
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "labels" / "train").mkdir(parents=True)
+
+    return dataset_path
+
+
+@pytest.fixture
+def yolo_labels_no_images(tmp_path: Path) -> Path:
+    """Create a near-miss YOLO dataset: labels/ dir with .txt files but no images/."""
+    dataset_path = tmp_path / "yolo_labels_no_images"
+    dataset_path.mkdir()
+
+    labels_dir = dataset_path / "labels"
+    labels_dir.mkdir()
+    (labels_dir / "img001.txt").write_text("0 0.5 0.5 0.2 0.3\n")
+    (labels_dir / "img002.txt").write_text("1 0.3 0.7 0.1 0.2\n")
+
+    return dataset_path
+
+
+@pytest.fixture
+def coco_missing_keys(tmp_path: Path) -> Path:
+    """Create a near-miss COCO dataset: JSON with images but missing categories."""
+    dataset_path = tmp_path / "coco_missing_keys"
+    dataset_path.mkdir()
+
+    annotations_dir = dataset_path / "annotations"
+    annotations_dir.mkdir()
+
+    coco_data = {
+        "images": [{"id": 1, "file_name": "img001.jpg"}],
+        "annotations": [{"id": 1, "image_id": 1, "bbox": [10, 20, 30, 40]}],
+    }
+    (annotations_dir / "instances_train.json").write_text(json.dumps(coco_data))
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_half_pair(tmp_path: Path) -> Path:
+    """Create a near-miss mask dataset: images/ dir with images but no masks/."""
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_half_pair"
+    dataset_path.mkdir()
+
+    images_dir = dataset_path / "images"
+    images_dir.mkdir()
+
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(images_dir / "img001.jpg"), img)
+
+    return dataset_path
+
+
+@pytest.fixture
+def mask_rgb_no_config(tmp_path: Path) -> Path:
+    """Near-miss mask dataset: RGB masks but no classes.yaml."""
+    import cv2
+    import numpy as np
+
+    dataset_path = tmp_path / "mask_rgb_no_config"
+    dataset_path.mkdir()
+
+    (dataset_path / "images" / "train").mkdir(parents=True)
+    (dataset_path / "masks" / "train").mkdir(parents=True)
+
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    cv2.imwrite(str(dataset_path / "images" / "train" / "img001.jpg"), img)
+
+    # RGB mask (3-channel)
+    mask = np.zeros((100, 100, 3), dtype=np.uint8)
+    mask[20:40, 20:40] = [220, 20, 60]
+    mask[60:80, 60:80] = [0, 0, 142]
+    cv2.imwrite(str(dataset_path / "masks" / "train" / "img001.png"), mask)
+
+    return dataset_path
+
+
+@pytest.fixture
 def mask_dataset_dimension_mismatch(tmp_path: Path) -> Path:
     """Create a mask dataset where image and mask have different dimensions.
 

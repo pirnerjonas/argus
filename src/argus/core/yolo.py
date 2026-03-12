@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from argus.core.base import IMAGE_EXTENSIONS, Dataset, DatasetFormat, TaskType
+from argus.core.probe import FormatProbe
 
 
 @dataclass
@@ -65,6 +66,105 @@ class YOLODataset(Dataset):
 
         # Try classification (directory-based structure)
         return cls._detect_classification(path)
+
+    @classmethod
+    def probe(cls, path: Path) -> FormatProbe | None:
+        """Probe for partial YOLO dataset evidence.
+
+        Returns a FormatProbe when there's partial evidence of a YOLO dataset,
+        or None when there's no evidence at all.
+        """
+        path = Path(path)
+        if not path.is_dir():
+            return None
+
+        # Check YAML files for near-miss configs
+        yaml_files = list(path.glob("*.yaml")) + list(path.glob("*.yml"))
+        for yaml_file in yaml_files:
+            try:
+                with open(yaml_file, encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
+                if not isinstance(config, dict):
+                    continue
+
+                # Skip mask dataset configs
+                if "ignore_index" in config or "palette" in config:
+                    continue
+
+                has_path_keys = any(k in config for k in ("path", "train", "val"))
+
+                # Case 1: Has path/train/val but missing names
+                if has_path_keys and "names" not in config:
+                    return FormatProbe(
+                        path=path,
+                        format="yolo",
+                        evidence_found=[
+                            f"found {yaml_file.name} with path/train/val keys"
+                        ],
+                        evidence_missing=["missing 'names' key"],
+                        confidence="strong",
+                    )
+
+                # Case 2: Has names but no matching split directories
+                if "names" in config:
+                    splits, _ = cls._detect_splits(path, config)
+                    if not splits:
+                        return FormatProbe(
+                            path=path,
+                            format="yolo",
+                            evidence_found=[f"found {yaml_file.name} with 'names' key"],
+                            evidence_missing=["no matching split directories found"],
+                            confidence="strong",
+                        )
+
+            except (yaml.YAMLError, OSError):
+                continue
+
+        # Case 3: Found labels/ without sibling images/
+        labels_dir = path / "labels"
+        images_dir = path / "images"
+        if labels_dir.is_dir() and not images_dir.is_dir():
+            has_txt = any(labels_dir.rglob("*.txt"))
+            if has_txt:
+                return FormatProbe(
+                    path=path,
+                    format="yolo",
+                    evidence_found=["found labels/ directory with .txt files"],
+                    evidence_missing=["no images/ directory"],
+                    confidence="strong",
+                )
+
+        # Case 4: Classification-like structure but <2 class dirs
+        if images_dir.is_dir():
+            for split_name in ["train", "val", "test"]:
+                split_dir = images_dir / split_name
+                if not split_dir.is_dir():
+                    continue
+                class_dirs = [
+                    d
+                    for d in split_dir.iterdir()
+                    if d.is_dir()
+                    and any(
+                        f.suffix.lower() in IMAGE_EXTENSIONS
+                        for f in d.iterdir()
+                        if f.is_file()
+                    )
+                ]
+                if len(class_dirs) == 1:
+                    return FormatProbe(
+                        path=path,
+                        format="yolo",
+                        evidence_found=[
+                            "classification-like structure "
+                            f"(images/{split_name}/ with subdirectories)"
+                        ],
+                        evidence_missing=[
+                            "only 1 class directory found (need at least 2)"
+                        ],
+                        confidence="weak",
+                    )
+
+        return None
 
     @classmethod
     def _detect_yaml_based(cls, path: Path) -> "YOLODataset | None":
