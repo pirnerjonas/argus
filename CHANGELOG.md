@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v1.10.4 (2026-03-12)
+
+### Bug Fixes
+
+- Make YOLO stats image-centric to match ultralytics
+  ([#73](https://github.com/pirnerjonas/argus/pull/73),
+  [`38abbc1`](https://github.com/pirnerjonas/argus/commit/38abbc17a74ac3f970318b1bbb7d91a33c813a6b))
+
+- Make YOLO stats image-centric to match ultralytics behaviour
+  ([#73](https://github.com/pirnerjonas/argus/pull/73),
+  [`38abbc1`](https://github.com/pirnerjonas/argus/commit/38abbc17a74ac3f970318b1bbb7d91a33c813a6b))
+
+- **ci**: Use --group instead of --only-group for integration job
+  ([#73](https://github.com/pirnerjonas/argus/pull/73),
+  [`38abbc1`](https://github.com/pirnerjonas/argus/commit/38abbc17a74ac3f970318b1bbb7d91a33c813a6b))
+
+### Refactoring
+
+- Extract IMAGE_EXTENSIONS constant and restore deleted YOLO tests
+  ([#73](https://github.com/pirnerjonas/argus/pull/73),
+  [`38abbc1`](https://github.com/pirnerjonas/argus/commit/38abbc17a74ac3f970318b1bbb7d91a33c813a6b))
+
+### Testing
+
+- Add ultralytics ground-truth cross-validation for YOLO stats
+  ([#73](https://github.com/pirnerjonas/argus/pull/73),
+  [`38abbc1`](https://github.com/pirnerjonas/argus/commit/38abbc17a74ac3f970318b1bbb7d91a33c813a6b))
+
+
 ## v1.10.3 (2026-03-06)
 
 ### Bug Fixes
