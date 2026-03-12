@@ -28,10 +28,28 @@ jobs:
         run: |
           uv sync --group dev
           uv run ruff check .
-          uv run pytest
+          uv run pytest -m "not integration"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      - name: Run integration tests
+        run: |
+          uv sync --group dev --group integration
+          uv run pytest -m integration
 
   release:
-    needs: test
+    needs: [test, integration]
     runs-on: ubuntu-latest
     permissions:
       contents: write

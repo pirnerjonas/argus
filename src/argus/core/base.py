@@ -29,6 +29,9 @@ class Partitioning(str, Enum):
     UNSPLIT = "unsplit"
 
 
+IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"})
+
+
 @dataclass
 class Dataset(ABC):
     """Base class for all dataset formats.

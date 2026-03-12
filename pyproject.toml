@@ -21,6 +21,7 @@ dev = [
     "build>=1.0.0",
     "prek>=0.2.30",
 ]
+integration = ["ultralytics>=8.0.0"]
 docs = [
     "mkdocs-material>=9.5.0",
     "mkdocstrings[python]>=0.25.0",
@@ -42,6 +43,7 @@ packages = ["src/argus"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["integration: cross-validation tests requiring extra dependencies (e.g. ultralytics)"]
 
 [tool.ruff.lint]
 select = [

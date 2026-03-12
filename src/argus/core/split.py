@@ -14,9 +14,9 @@ from typing import Literal
 import numpy as np
 import yaml
 
-from argus.core.base import TaskType
+from argus.core.base import IMAGE_EXTENSIONS, TaskType
 from argus.core.coco import COCODataset
-from argus.core.mask import IMAGE_EXTENSIONS, MaskDataset
+from argus.core.mask import MaskDataset
 from argus.core.yolo import YOLODataset
 
 _SPLITS = ("train", "val", "test")
@@ -314,7 +314,6 @@ def _split_yolo_classification_dataset(
     stratify: bool,
     seed: int,
 ) -> dict[str, int]:
-    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
     class_to_idx = {name: i for i, name in enumerate(dataset.class_names)}
 
     item_to_image: dict[str, Path] = {}
@@ -327,7 +326,7 @@ def _split_yolo_classification_dataset(
         if not class_dir.is_dir():
             continue
         for image_path in sorted(class_dir.iterdir()):
-            if image_path.suffix.lower() not in image_extensions:
+            if image_path.suffix.lower() not in IMAGE_EXTENSIONS:
                 continue
             item_id = str(item_index)
             item_index += 1
@@ -603,7 +602,6 @@ def _unsplit_yolo_classification_dataset(
     output_path: Path,
     collision_policy: CollisionPolicy = "error",
 ) -> dict[str, int]:
-    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
     images_root = dataset.path / "images"
     total_images = 0
 
@@ -621,7 +619,7 @@ def _unsplit_yolo_classification_dataset(
                 continue
             class_out = output_path / class_name
             for image_src in sorted(class_dir.iterdir()):
-                if image_src.suffix.lower() not in image_extensions:
+                if image_src.suffix.lower() not in IMAGE_EXTENSIONS:
                     continue
                 out_name = _resolve_collision_name(
                     file_name=image_src.name,
