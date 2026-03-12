@@ -12,6 +12,8 @@ import pytest
 
 ultralytics = pytest.importorskip("ultralytics", reason="ultralytics not installed")
 
+pytestmark = pytest.mark.integration
+
 from yolo_ground_truth import get_ground_truth_stats  # noqa: E402
 
 from argus.core import YOLODataset  # noqa: E402

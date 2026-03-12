@@ -43,6 +43,7 @@ packages = ["src/argus"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["integration: cross-validation tests requiring extra dependencies (e.g. ultralytics)"]
 
 [tool.ruff.lint]
 select = [
