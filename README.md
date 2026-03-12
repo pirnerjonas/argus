@@ -43,7 +43,7 @@ uvx argus-cv view /path/to/dataset --split val
 uvx argus-cv split /path/to/dataset -o /path/to/output -r 0.8,0.1,0.1
 
 # Merge a split dataset back into unsplit layout
-uvx argus-cv unsplit -d /path/to/split_dataset -o /path/to/output
+uvx argus-cv unsplit /path/to/split_dataset -o /path/to/output
 
 # Filter dataset to selected classes
 uvx argus-cv filter /path/to/dataset -o /path/to/output --classes person,car
