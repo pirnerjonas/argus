@@ -24,6 +24,9 @@ argus-cv stats /data/animals
 # Visual inspection
 argus-cv view /data/animals --split val
 
+# Validate before training
+argus-cv validate /data/animals
+
 # Convert mask dataset to YOLO segmentation
 argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
 ```
@@ -45,6 +48,10 @@ argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
     <p>Browse images with boxes, polygons, and mask overlays. Pan and zoom included.</p>
   </div>
   <div class="card">
+    <h3>Dataset validation</h3>
+    <p>Catch missing masks, broken references, and bad coordinates before training.</p>
+  </div>
+  <div class="card">
     <h3>Clean splits</h3>
     <p>Stratified splitting for YOLO and COCO with deterministic seeds.</p>
   </div>
@@ -57,6 +64,12 @@ argus-cv convert -i /data/animals_masks -o /data/animals_yolo --to yolo-seg
     ```bash
     argus-cv list --path /datasets
     argus-cv stats /datasets/retail
+    ```
+
+=== "Validate"
+
+    ```bash
+    argus-cv validate /datasets/retail --strict
     ```
 
 === "Find label issues"
