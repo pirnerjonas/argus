@@ -9,6 +9,7 @@ from argus.commands.list_command import list_datasets
 from argus.commands.split_command import split_dataset
 from argus.commands.stats_command import stats
 from argus.commands.unsplit_command import unsplit_dataset
+from argus.commands.validate_command import validate
 from argus.commands.view_command import view
 from argus.discovery import _detect_dataset, _discover_datasets
 from argus.rendering import _draw_annotations, _generate_class_colors
@@ -34,6 +35,7 @@ app.command(name="split")(split_dataset)
 app.command(name="unsplit")(unsplit_dataset)
 app.command(name="convert")(convert_dataset)
 app.command(name="filter")(filter_dataset)
+app.command(name="validate")(validate)
 
 __all__ = [
     "app",
@@ -46,6 +48,7 @@ __all__ = [
     "unsplit_dataset",
     "convert_dataset",
     "filter_dataset",
+    "validate",
     "_discover_datasets",
     "_detect_dataset",
     "_generate_class_colors",
