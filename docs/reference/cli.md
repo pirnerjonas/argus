@@ -15,6 +15,7 @@ Commands:
 - `unsplit`: merge split datasets into unsplit layout
 - `filter`: keep only selected classes in a copied dataset
 - `convert`: convert between supported segmentation formats
+- `validate`: check a dataset for annotation quality issues
 
 ## list
 
@@ -91,3 +92,17 @@ argus-cv convert -i /datasets/yolo_seg -o /datasets/rf_coco_rle --to roboflow-co
 - `--to` (default: `yolo-seg`): `yolo-seg`, `coco`, `roboflow-coco`, or `roboflow-coco-rle`
 - `--epsilon-factor`, `-e` (default: `0.005`): polygon simplification for mask -> YOLO
 - `--min-area`, `-a` (default: `100.0`): minimum contour area for mask -> YOLO
+
+## validate
+
+```bash
+argus-cv validate /datasets/retail
+argus-cv validate /datasets/retail --strict --split train
+argus-cv validate /datasets/retail --check-images --max-issues 20
+```
+
+- `DATASET` (default: `.`): dataset root path
+- `--strict`: treat warnings as failures (exit code 1)
+- `--split`: validate only a specific split (`train`, `val`, `test`)
+- `--max-issues` (default: `0`): maximum issues to display; `0` shows all
+- `--check-images`: verify image files are readable (slower)

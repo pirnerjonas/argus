@@ -8,6 +8,8 @@ Canonical imports use `argus.core`:
 from argus.core import (
     COCODataset,
     MaskDataset,
+    ValidationIssue,
+    ValidationReport,
     YOLODataset,
     convert_mask_to_yolo_labels,
     convert_mask_to_yolo_seg,
@@ -24,6 +26,7 @@ from argus.core import (
     unsplit_coco_dataset,
     unsplit_mask_dataset,
     unsplit_yolo_dataset,
+    validate_dataset,
 )
 ```
 
@@ -106,3 +109,17 @@ from argus.core import (
 ### `convert_yolo_seg_to_roboflow_coco_rle`
 
 ::: argus.core.convert_yolo_seg_to_roboflow_coco_rle
+
+## Validation
+
+### `validate_dataset`
+
+::: argus.core.validate_dataset
+
+### `ValidationReport`
+
+::: argus.core.ValidationReport
+
+### `ValidationIssue`
+
+::: argus.core.ValidationIssue

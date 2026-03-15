@@ -26,6 +26,7 @@ from argus.core.split import (
     unsplit_mask_dataset,
     unsplit_yolo_dataset,
 )
+from argus.core.validation import ValidationIssue, ValidationReport, validate_dataset
 from argus.core.yolo import YOLODataset
 
 __all__ = [
@@ -53,4 +54,7 @@ __all__ = [
     "convert_yolo_seg_to_coco",
     "convert_yolo_seg_to_roboflow_coco",
     "convert_yolo_seg_to_roboflow_coco_rle",
+    "validate_dataset",
+    "ValidationIssue",
+    "ValidationReport",
 ]
