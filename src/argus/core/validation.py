@@ -101,7 +101,9 @@ def _validate_common(
     """Run universal validation checks applicable to all formats."""
     issues: list[ValidationIssue] = []
 
-    splits_to_check = [split] if split else (dataset.splits if dataset.splits else [None])
+    splits_to_check = (
+        [split] if split else (dataset.splits if dataset.splits else [None])
+    )
 
     for s in splits_to_check:
         split_name = s or "unsplit"
@@ -127,7 +129,10 @@ def _validate_common(
                     ValidationIssue(
                         level="error",
                         code="E102",
-                        message=f"Duplicate image filename '{name}' in split '{split_name}'.",
+                        message=(
+                            f"Duplicate image filename '{name}' "
+                            f"in split '{split_name}'."
+                        ),
                         file=img_path,
                         split=split_name,
                     )
@@ -178,7 +183,9 @@ def _validate_yolo(
     if dataset.task == TaskType.CLASSIFICATION:
         return issues
 
-    splits_to_check = [split] if split else (dataset.splits if dataset.splits else ["unsplit"])
+    splits_to_check = (
+        [split] if split else (dataset.splits if dataset.splits else ["unsplit"])
+    )
 
     for s in splits_to_check:
         if s == "unsplit":
@@ -194,7 +201,8 @@ def _validate_yolo(
         image_stems: set[str] = set()
         if image_dir.is_dir():
             image_stems = {
-                f.stem for f in image_dir.iterdir()
+                f.stem
+                for f in image_dir.iterdir()
                 if f.suffix.lower() in IMAGE_EXTENSIONS
             }
 
@@ -207,7 +215,9 @@ def _validate_yolo(
                     ValidationIssue(
                         level="warning",
                         code="W201",
-                        message=f"Label file has no corresponding image: {label_file.name}",
+                        message=(
+                            f"Label file has no corresponding image: {label_file.name}"
+                        ),
                         file=label_file,
                         split=s,
                     )
@@ -233,7 +243,8 @@ def _validate_yolo(
                                 level="error",
                                 code="E201",
                                 message=(
-                                    f"Line {line_num}: expected {expected_cols} columns, "
+                                    f"Line {line_num}: expected "
+                                    f"{expected_cols} columns, "
                                     f"got {len(parts)}."
                                 ),
                                 file=label_file,
@@ -298,7 +309,7 @@ def _validate_yolo(
                     continue
 
                 # Check bounds [0, 1]
-                for i, val in enumerate(coords):
+                for val in coords:
                     if val < 0.0 or val > 1.0:
                         issues.append(
                             ValidationIssue(
@@ -322,7 +333,9 @@ def _validate_yolo(
                             ValidationIssue(
                                 level="error",
                                 code="E204",
-                                message=f"Line {line_num}: zero or negative box dimensions.",
+                                message=(
+                                    f"Line {line_num}: zero or negative box dimensions."
+                                ),
                                 file=label_file,
                                 split=s,
                             )
@@ -391,8 +404,7 @@ def _validate_coco(
                 image_ids.add(img_id)
 
         category_ids = {
-            cat["id"] for cat in categories
-            if isinstance(cat, dict) and "id" in cat
+            cat["id"] for cat in categories if isinstance(cat, dict) and "id" in cat
         }
 
         # Check for images without annotations
@@ -426,7 +438,9 @@ def _validate_coco(
                     ValidationIssue(
                         level="error",
                         code="E301",
-                        message=f"Annotation references non-existent image_id: {image_id}",
+                        message=(
+                            f"Annotation references non-existent image_id: {image_id}"
+                        ),
                         file=ann_file,
                         split=file_split,
                     )
@@ -441,7 +455,9 @@ def _validate_coco(
                     ValidationIssue(
                         level="error",
                         code="E302",
-                        message=f"Annotation references non-existent category_id: {cat_id}",
+                        message=(
+                            f"Annotation references non-existent category_id: {cat_id}"
+                        ),
                         file=ann_file,
                         split=file_split,
                     )
@@ -450,15 +466,17 @@ def _validate_coco(
             # Check bbox validity
             bbox = ann.get("bbox")
             if bbox and isinstance(bbox, list) and len(bbox) >= 4:
-                x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
+                _, _, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
                 if w <= 0 or h <= 0:
+                    neg = w < 0 or h < 0
+                    dim_kind = "negative" if neg else "zero"
                     issues.append(
                         ValidationIssue(
                             level="error",
                             code="E304",
                             message=(
-                                f"Annotation {ann_id}: invalid bbox with "
-                                f"{'negative' if w < 0 or h < 0 else 'zero'} dimensions."
+                                f"Annotation {ann_id}: invalid bbox "
+                                f"with {dim_kind} dimensions."
                             ),
                             file=ann_file,
                             split=file_split,
@@ -485,18 +503,21 @@ def _validate_coco(
 
         # Warn about images without annotations
         for img in images:
-            if isinstance(img, dict) and "id" in img:
-                if img["id"] not in annotated_image_ids:
-                    file_name = img.get("file_name", f"id={img['id']}")
-                    issues.append(
-                        ValidationIssue(
-                            level="warning",
-                            code="W301",
-                            message=f"Image has no annotations: {file_name}",
-                            file=ann_file,
-                            split=file_split,
-                        )
+            if (
+                isinstance(img, dict)
+                and "id" in img
+                and img["id"] not in annotated_image_ids
+            ):
+                file_name = img.get("file_name", f"id={img['id']}")
+                issues.append(
+                    ValidationIssue(
+                        level="warning",
+                        code="W301",
+                        message=f"Image has no annotations: {file_name}",
+                        file=ann_file,
+                        split=file_split,
                     )
+                )
 
     return issues
 
@@ -511,7 +532,6 @@ def _validate_mask(
 
     issues: list[ValidationIssue] = []
     images_root = dataset.path / dataset.images_dir
-    masks_root = dataset.path / dataset.masks_dir
 
     splits_to_check = (
         [split] if split else (dataset.splits if dataset.splits else [None])
@@ -520,7 +540,6 @@ def _validate_mask(
     for s in splits_to_check:
         split_name = s or "unsplit"
         image_dir = images_root / s if s else images_root
-        mask_dir = masks_root / s if s else masks_root
 
         if not image_dir.is_dir():
             continue

@@ -70,7 +70,7 @@ def coco_bad_annotations(tmp_path: Path) -> Path:
         "images": [
             {"id": 1, "file_name": "img001.jpg", "width": 640, "height": 480},
             {"id": 1, "file_name": "img002.jpg", "width": 640, "height": 480},  # dup ID
-            {"id": 3, "file_name": "img003.jpg", "width": 640, "height": 480},  # no anns
+            {"id": 3, "file_name": "img003.jpg", "width": 640, "height": 480},
         ],
         "annotations": [
             # Good annotation
@@ -340,9 +340,7 @@ class TestCLIValidate:
         assert result.exit_code == 1
 
     def test_strict_mode(self, coco_bad_annotations: Path) -> None:
-        result = runner.invoke(
-            app, ["validate", str(coco_bad_annotations), "--strict"]
-        )
+        result = runner.invoke(app, ["validate", str(coco_bad_annotations), "--strict"])
         assert result.exit_code == 1
 
     def test_max_issues(self, yolo_bad_labels: Path) -> None:

@@ -17,7 +17,7 @@ def validate(
     dataset: Annotated[
         Path | None,
         typer.Argument(
-            help="Path to the dataset root directory. Defaults to the current directory.",
+            help="Path to the dataset root directory.",
             show_default=False,
         ),
     ] = None,
@@ -31,7 +31,7 @@ def validate(
     ] = None,
     max_issues: Annotated[
         int,
-        typer.Option("--max-issues", help="Maximum number of issues to display (0=all)."),
+        typer.Option("--max-issues", help="Max issues to display (0=all)."),
     ] = 0,
     check_images: Annotated[
         bool,
@@ -63,9 +63,7 @@ def validate(
         transient=True,
     ) as progress:
         progress.add_task("Validating dataset...", total=None)
-        report = validate_dataset(
-            detected, split=split, check_images=check_images
-        )
+        report = validate_dataset(detected, split=split, check_images=check_images)
 
     if not report.issues:
         console.print(
@@ -80,9 +78,7 @@ def validate(
     if max_issues > 0:
         issues_to_show = issues_to_show[:max_issues]
 
-    table = Table(
-        title=f"Validation: {dataset_path.name} ({detected.format.value})"
-    )
+    table = Table(title=f"Validation: {dataset_path.name} ({detected.format.value})")
     table.add_column("Level", style="bold", width=7)
     table.add_column("Code", style="cyan", width=5)
     table.add_column("Split", width=8)
