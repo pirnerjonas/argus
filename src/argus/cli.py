@@ -1,7 +1,10 @@
 """Argus CLI - Vision AI dataset toolkit."""
 
+from typing import Annotated
+
 import typer
 
+from argus import __version__
 from argus.cli_common import console
 from argus.commands.convert_command import convert_dataset
 from argus.commands.filter_command import filter_dataset
@@ -21,8 +24,25 @@ app = typer.Typer(
 )
 
 
+def _version_callback(value: bool) -> None:
+    """Print the package version and exit before running a command."""
+    if value:
+        typer.echo(f"argus-cv {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def callback() -> None:
+def callback(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the version and exit.",
+        ),
+    ] = False,
+) -> None:
     """Vision AI dataset toolkit for working with YOLO, COCO, and mask datasets."""
     pass
 
