@@ -255,6 +255,12 @@ class _ClassificationGridViewer:
         # Calculate grid layout
         self.cols, self.rows = self._calculate_grid_layout()
 
+        # Cache resized thumbnails and the composed grid so idle refreshes do not
+        # repeatedly decode and resize every class image.
+        self._thumbnail_cache: dict[Path, np.ndarray] = {}
+        self._grid_cache: np.ndarray | None = None
+        self._grid_dirty = True
+
     def _calculate_grid_layout(self) -> tuple[int, int]:
         """Calculate optimal grid layout based on number of classes."""
         n = len(self.class_names)
@@ -268,22 +274,37 @@ class _ClassificationGridViewer:
         rows = int(math.ceil(n / cols))
         return cols, rows
 
+    def _get_thumbnail(self, image_path: Path) -> np.ndarray | None:
+        """Load and resize an image once, then reuse the cached thumbnail."""
+        cached = self._thumbnail_cache.get(image_path)
+        if cached is not None:
+            return cached
+
+        if not image_path.exists():
+            return None
+
+        img = cv2.imread(str(image_path))
+        if img is None:
+            return None
+
+        h, w = img.shape[:2]
+        scale = min(self.tile_size / w, self.tile_size / h)
+        new_w = max(1, int(w * scale))
+        new_h = max(1, int(h * scale))
+        thumbnail = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        self._thumbnail_cache[image_path] = thumbnail
+        return thumbnail
+
     def _create_tile(
         self, class_name: str, image_path: Path | None, index: int, total: int
     ) -> np.ndarray:
         """Create a single tile for a class."""
         tile = np.zeros((self.tile_size, self.tile_size, 3), dtype=np.uint8)
 
-        if image_path is not None and image_path.exists():
-            # Load and resize image
-            img = cv2.imread(str(image_path))
-            if img is not None:
-                # Resize maintaining aspect ratio
-                h, w = img.shape[:2]
-                scale = min(self.tile_size / w, self.tile_size / h)
-                new_w = int(w * scale)
-                new_h = int(h * scale)
-                resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        if image_path is not None:
+            resized = self._get_thumbnail(image_path)
+            if resized is not None:
+                new_h, new_w = resized.shape[:2]
 
                 # Center in tile
                 x_offset = (self.tile_size - new_w) // 2
@@ -327,6 +348,9 @@ class _ClassificationGridViewer:
 
     def _compose_grid(self) -> np.ndarray:
         """Compose all tiles into a single grid image."""
+        if not self._grid_dirty and self._grid_cache is not None:
+            return self._grid_cache
+
         grid_h = self.rows * self.tile_size
         grid_w = self.cols * self.tile_size
         grid = np.zeros((grid_h, grid_w, 3), dtype=np.uint8)
@@ -354,20 +378,28 @@ class _ClassificationGridViewer:
             x_end = x_start + self.tile_size
             grid[y_start:y_end, x_start:x_end] = tile
 
+        self._grid_cache = grid
+        self._grid_dirty = False
         return grid
+
+    def _set_current_index(self, index: int) -> None:
+        """Update the global image index and invalidate the grid if it changed."""
+        if index != self.current_index:
+            self.current_index = index
+            self._grid_dirty = True
 
     def _next_images(self) -> None:
         """Advance to next image index."""
         if self.max_images > 0:
-            self.current_index = min(self.current_index + 1, self.max_images - 1)
+            self._set_current_index(min(self.current_index + 1, self.max_images - 1))
 
     def _prev_images(self) -> None:
         """Go back to previous image index."""
-        self.current_index = max(self.current_index - 1, 0)
+        self._set_current_index(max(self.current_index - 1, 0))
 
     def _reset_indices(self) -> None:
         """Reset to first image."""
-        self.current_index = 0
+        self._set_current_index(0)
 
     def run(self) -> None:
         """Run the interactive grid viewer."""
