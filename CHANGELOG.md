@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-09-20)
+
+### Features
+
+- Add CLI --version option ([#79](https://github.com/pirnerjonas/argus/pull/79),
+  [`f6f5f0c`](https://github.com/pirnerjonas/argus/commit/f6f5f0cf20532dee8023757ca5fd595a435b7f41))
+
+
 ## v1.10.5 (2026-09-20)
 
 ### Code Style
