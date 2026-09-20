@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.10.5 (2026-09-20)
+
+### Code Style
+
+- Apply ruff formatting ([#78](https://github.com/pirnerjonas/argus/pull/78),
+  [`ffa8427`](https://github.com/pirnerjonas/argus/commit/ffa8427d62e6ce3bd2154e2fbe96a734422a9efc))
+
+### Performance Improvements
+
+- Cache classification grid thumbnails ([#78](https://github.com/pirnerjonas/argus/pull/78),
+  [`ffa8427`](https://github.com/pirnerjonas/argus/commit/ffa8427d62e6ce3bd2154e2fbe96a734422a9efc))
+
+- Speed up classification grid viewer ([#78](https://github.com/pirnerjonas/argus/pull/78),
+  [`ffa8427`](https://github.com/pirnerjonas/argus/commit/ffa8427d62e6ce3bd2154e2fbe96a734422a9efc))
+
+### Testing
+
+- Cover classification grid caching ([#78](https://github.com/pirnerjonas/argus/pull/78),
+  [`ffa8427`](https://github.com/pirnerjonas/argus/commit/ffa8427d62e6ce3bd2154e2fbe96a734422a9efc))
+
+- **coco**: Add pycocotools cross-validation integration tests
+  ([`4e776dc`](https://github.com/pirnerjonas/argus/commit/4e776dceb9af8a306b5b9b111a1896de8433e1a4))
+
+
 ## v1.10.4 (2026-03-12)
 
 ### Bug Fixes
