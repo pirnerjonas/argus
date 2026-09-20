@@ -1,6 +1,7 @@
 """Tests for global CLI options."""
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from argus import __version__
@@ -21,4 +22,4 @@ def test_help_includes_version() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "--version" in result.stdout
+    assert "--version" in unstyle(result.stdout)
