@@ -291,9 +291,7 @@ class _ClassificationGridViewer:
         scale = min(self.tile_size / w, self.tile_size / h)
         new_w = max(1, int(w * scale))
         new_h = max(1, int(h * scale))
-        thumbnail = cv2.resize(
-            img, (new_w, new_h), interpolation=cv2.INTER_AREA
-        )
+        thumbnail = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
         self._thumbnail_cache[image_path] = thumbnail
         return thumbnail
 
@@ -393,9 +391,7 @@ class _ClassificationGridViewer:
     def _next_images(self) -> None:
         """Advance to next image index."""
         if self.max_images > 0:
-            self._set_current_index(
-                min(self.current_index + 1, self.max_images - 1)
-            )
+            self._set_current_index(min(self.current_index + 1, self.max_images - 1))
 
     def _prev_images(self) -> None:
         """Go back to previous image index."""
