@@ -43,6 +43,11 @@ argus-cv view /datasets/retail --split val --opacity 0.5
 - `--split`, `-s`: split to view (`train`, `val`, `test`)
 - `--max-classes`, `-m`: cap classes in classification grid viewer
 - `--opacity`, `-o` (default: `0.5`): mask overlay opacity (`0.0..1.0`)
+- `--port` (default: `0`): local port; `0` selects an available port
+- `--no-browser`: print the viewer URL without opening a browser
+
+The web viewer binds to localhost. Stop it with Ctrl+C in the terminal. See the
+[viewer guide](../guides/viewer.md) for sorting, controls, and SSH forwarding.
 
 ## split
 

@@ -1,0 +1,32 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #11151b; color: #e9edf3; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 22px 32px; border-bottom: 1px solid #323c49; }
+header > div { display: flex; align-items: center; gap: 24px; }
+.brand { color: #8fd9b3; font-size: 14px; letter-spacing: .18em; font-weight: 800; }
+h1 { margin: 0; font-size: 20px; font-weight: 550; overflow-wrap: anywhere; }
+header p, footer { color: #9daaba; font-size: 13px; }
+main { padding: 24px 32px; max-width: 1800px; margin: auto; }
+.toolbar { display: flex; gap: 18px; align-items: end; flex-wrap: wrap; }
+label { display: flex; flex-direction: column; gap: 7px; color: #b9c4d2; font-size: 13px; }
+.search { flex: 1; min-width: 190px; }
+input, select, button { font: inherit; color: #e9edf3; background: #1c2430; border: 1px solid #465364; border-radius: 6px; padding: 10px 12px; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid #8fd9b3; outline-offset: 3px; }
+.toggle { flex-direction: row; align-items: center; padding-bottom: 10px; }
+button { cursor: pointer; }
+button:hover:enabled { background: #2b3948; }
+button:disabled { opacity: .4; cursor: default; }
+nav { display: flex; align-items: center; gap: 18px; margin-top: 24px; }
+#position { color: #b9c4d2; font-size: 14px; }
+#reset { margin-left: auto; }
+#status { min-height: 20px; color: #b9c4d2; font-size: 14px; }
+#viewer { display: grid; gap: 18px; }
+#viewer.grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+figure { margin: 0; min-width: 0; border: 1px solid #34404e; border-radius: 8px; overflow: hidden; background: #090c10; }
+.viewport { height: 62vh; min-height: 240px; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; }
+.grid .viewport { height: 290px; }
+.viewport img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; transform-origin: center; }
+.viewport .error { color: #f1b7a9; padding: 20px; }
+figcaption { padding: 12px 16px; background: #1a222c; font-size: 14px; overflow-wrap: anywhere; }
+footer { margin-top: 22px; line-height: 1.8; }
+@media (max-width: 650px) { header, main { padding: 18px; } header p { display: none; } header > div { gap: 14px; } nav { gap: 8px; flex-wrap: wrap; } #reset { margin-left: 0; } }

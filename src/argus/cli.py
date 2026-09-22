@@ -15,7 +15,7 @@ from argus.commands.unsplit_command import unsplit_dataset
 from argus.commands.view_command import view
 from argus.discovery import _detect_dataset, _discover_datasets
 from argus.rendering import _draw_annotations, _generate_class_colors
-from argus.viewers import _ClassificationGridViewer, _ImageViewer, _MaskViewer
+from argus.viewers import WebViewer
 
 app = typer.Typer(
     name="argus-cv",
@@ -70,9 +70,7 @@ __all__ = [
     "_detect_dataset",
     "_generate_class_colors",
     "_draw_annotations",
-    "_ImageViewer",
-    "_ClassificationGridViewer",
-    "_MaskViewer",
+    "WebViewer",
 ]
 
 

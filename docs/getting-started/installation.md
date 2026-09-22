@@ -46,4 +46,5 @@ argus-cv --help
 ## Requirements
 
 - Python 3.10+
-- OpenCV is used for the viewer; you will need a desktop environment for it.
+- A web browser for the local viewer; the dataset machine does not need a desktop.
+- OpenCV is still used for image decoding and annotation rendering.

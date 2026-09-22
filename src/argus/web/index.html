@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Argus viewer</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script src="viewer.js" defer></script>
+</head>
+<body>
+  <header><div><span class="brand">ARGUS</span><h1 id="title">Dataset viewer</h1></div><p>Visual inspection</p></header>
+  <main>
+    <form id="filters" class="toolbar">
+      <label class="search">Find an image<input id="search" type="search" placeholder="Search filename…" autocomplete="off"></label>
+      <label>Sort by<select id="sort"><option value="filename">Filename</option></select></label>
+      <label>Order<select id="direction"><option value="0">Ascending</option><option value="1">Descending</option></select></label>
+      <label class="toggle"><input id="annotations" type="checkbox" checked> Show annotations</label>
+    </form>
+    <nav aria-label="Image navigation"><button id="prev" type="button">← Previous</button><span id="position" aria-live="polite">Loading…</span><button id="next" type="button">Next →</button><button id="reset" type="button">Reset view</button></nav>
+    <p id="status" role="status">Loading dataset…</p>
+    <section id="viewer" aria-label="Dataset images"></section>
+    <footer>← / → or P / N: navigate · Scroll: zoom · Drag: pan · R: reset · T: annotations<br>Stop the server with Ctrl+C in your terminal.</footer>
+  </main>
+</body>
+</html>
