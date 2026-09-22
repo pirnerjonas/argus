@@ -1,691 +1,261 @@
-"""Interactive image viewers for CLI commands."""
+"""Local web viewer: dataset queries, image rendering, and a read-only HTTP API."""
 
+import json
+import secrets
+import webbrowser
+from contextlib import suppress
+from functools import lru_cache
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.resources import files
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import cv2
 import numpy as np
 
 from argus.cli_common import console
 from argus.core import COCODataset, Dataset, MaskDataset
-from argus.rendering import _draw_annotations
+from argus.core.base import TaskType
+from argus.rendering import _draw_annotations, _generate_class_colors
 
 
-class _ImageViewer:
-    """Interactive image viewer with zoom and pan support."""
+class WebViewer:
+    """Adapt existing dataset readers to a small, extensible browser API.
+
+    Image IDs are positions in a fixed allowlist, never filesystem paths from a
+    request. Add sort keys in ``query`` and controls in ``web/viewer.js``.
+    """
 
     def __init__(
         self,
-        image_paths: list[Path],
         dataset: Dataset,
-        class_colors: dict[str, tuple[int, int, int]],
-        window_name: str,
-    ):
-        self.image_paths = image_paths
-        self.dataset = dataset
-        self.class_colors = class_colors
-        self.window_name = window_name
-
-        self.current_idx = 0
-        self.zoom = 1.0
-        self.pan_x = 0.0
-        self.pan_y = 0.0
-
-        # Mouse state for panning
-        self.dragging = False
-        self.drag_start_x = 0
-        self.drag_start_y = 0
-        self.pan_start_x = 0.0
-        self.pan_start_y = 0.0
-
-        # Current image cache
-        self.current_img: np.ndarray | None = None
-        self.annotated_img: np.ndarray | None = None
-
-        # Annotation visibility toggle
-        self.show_annotations = True
-
-    def _load_current_image(self) -> bool:
-        """Load and annotate the current image."""
-        image_path = self.image_paths[self.current_idx]
-        annotations = self.dataset.get_annotations_for_image(image_path)
-
-        img = cv2.imread(str(image_path))
-        if img is None:
-            return False
-
-        self.current_img = img
-        self.annotated_img = _draw_annotations(
-            img.copy(), annotations, self.class_colors
-        )
-        return True
-
-    def _get_display_image(self) -> np.ndarray:
-        """Get the image transformed for current zoom/pan."""
-        if self.annotated_img is None:
-            return np.zeros((480, 640, 3), dtype=np.uint8)
-
-        if self.show_annotations:
-            img = self.annotated_img
-        elif self.current_img is not None:
-            img = self.current_img
-        else:
-            img = self.annotated_img
-        h, w = img.shape[:2]
-
-        if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
-            display = img.copy()
-        else:
-            # Calculate the visible region
-            view_w = int(w / self.zoom)
-            view_h = int(h / self.zoom)
-
-            # Center point with pan offset
-            cx = w / 2 + self.pan_x
-            cy = h / 2 + self.pan_y
-
-            # Calculate crop bounds
-            x1 = int(max(0, cx - view_w / 2))
-            y1 = int(max(0, cy - view_h / 2))
-            x2 = int(min(w, x1 + view_w))
-            y2 = int(min(h, y1 + view_h))
-
-            # Adjust if we hit boundaries
-            if x2 - x1 < view_w:
-                x1 = max(0, x2 - view_w)
-            if y2 - y1 < view_h:
-                y1 = max(0, y2 - view_h)
-
-            # Crop and resize
-            cropped = img[y1:y2, x1:x2]
-            display = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
-
-        # Add info overlay
-        image_path = self.image_paths[self.current_idx]
-        idx = self.current_idx + 1
-        total = len(self.image_paths)
-        info_text = f"[{idx}/{total}] {image_path.name}"
-        if self.zoom > 1.0:
-            info_text += f" (Zoom: {self.zoom:.1f}x)"
-        if not self.show_annotations:
-            info_text += " [Annotations: OFF]"
-
-        cv2.putText(
-            display,
-            info_text,
-            (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2,
-        )
-        cv2.putText(
-            display, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
-        )
-
-        return display
-
-    def _mouse_callback(
-        self, event: int, x: int, y: int, flags: int, param: None
-    ) -> None:
-        """Handle mouse events for zoom and pan."""
-        if event == cv2.EVENT_MOUSEWHEEL:
-            # Zoom in/out
-            if flags > 0:
-                self.zoom = min(10.0, self.zoom * 1.2)
-            else:
-                self.zoom = max(1.0, self.zoom / 1.2)
-
-            # Reset pan if zoomed out to 1x
-            if self.zoom == 1.0:
-                self.pan_x = 0.0
-                self.pan_y = 0.0
-
-        elif event == cv2.EVENT_LBUTTONDOWN:
-            self.dragging = True
-            self.drag_start_x = x
-            self.drag_start_y = y
-            self.pan_start_x = self.pan_x
-            self.pan_start_y = self.pan_y
-
-        elif event == cv2.EVENT_MOUSEMOVE and self.dragging:
-            if self.zoom > 1.0 and self.annotated_img is not None:
-                h, w = self.annotated_img.shape[:2]
-                # Calculate pan delta (inverted for natural feel)
-                dx = (self.drag_start_x - x) / self.zoom
-                dy = (self.drag_start_y - y) / self.zoom
-
-                # Update pan with limits
-                max_pan_x = w * (1 - 1 / self.zoom) / 2
-                max_pan_y = h * (1 - 1 / self.zoom) / 2
-
-                self.pan_x = max(-max_pan_x, min(max_pan_x, self.pan_start_x + dx))
-                self.pan_y = max(-max_pan_y, min(max_pan_y, self.pan_start_y + dy))
-
-        elif event == cv2.EVENT_LBUTTONUP:
-            self.dragging = False
-
-    def _reset_view(self) -> None:
-        """Reset zoom and pan to default."""
-        self.zoom = 1.0
-        self.pan_x = 0.0
-        self.pan_y = 0.0
-
-    def _next_image(self) -> None:
-        """Go to next image."""
-        self.current_idx = (self.current_idx + 1) % len(self.image_paths)
-        self._reset_view()
-
-    def _prev_image(self) -> None:
-        """Go to previous image."""
-        self.current_idx = (self.current_idx - 1) % len(self.image_paths)
-        self._reset_view()
-
-    def run(self) -> None:
-        """Run the interactive viewer."""
-        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
-        cv2.setMouseCallback(self.window_name, self._mouse_callback)
-
-        while True:
-            # Load image if needed
-            if self.annotated_img is None and not self._load_current_image():
-                console.print(
-                    f"[yellow]Warning: Could not load "
-                    f"{self.image_paths[self.current_idx]}[/yellow]"
-                )
-                self._next_image()
-                continue
-
-            # Display image
-            display = self._get_display_image()
-            cv2.imshow(self.window_name, display)
-
-            # Wait for input (short timeout for smooth panning)
-            key = cv2.waitKey(30) & 0xFF
-
-            # Handle keyboard input
-            if key == ord("q") or key == 27:  # Q or ESC
-                break
-            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
-                self.annotated_img = None
-                self._next_image()
-            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
-                self.annotated_img = None
-                self._prev_image()
-            elif key == ord("r"):  # R to reset zoom
-                self._reset_view()
-            elif key == ord("t"):  # T to toggle annotations
-                self.show_annotations = not self.show_annotations
-
-        cv2.destroyAllWindows()
-
-
-class _ClassificationGridViewer:
-    """Grid viewer for classification datasets showing one image per class."""
-
-    def __init__(
-        self,
-        images_by_class: dict[str, list[Path]],
-        class_names: list[str],
-        window_name: str,
+        split: str | None = None,
         max_classes: int | None = None,
-        tile_size: int = 300,
-    ):
-        # Limit classes if max_classes specified
-        if max_classes and len(class_names) > max_classes:
-            self.class_names = class_names[:max_classes]
-        else:
-            self.class_names = class_names
-
-        self.images_by_class = {
-            cls: images_by_class.get(cls, []) for cls in self.class_names
-        }
-        self.window_name = window_name
-        self.tile_size = tile_size
-
-        # Global image index (same for all classes)
-        self.current_index = 0
-
-        # Calculate max images across all classes
-        self.max_images = (
-            max(len(imgs) for imgs in self.images_by_class.values())
-            if self.images_by_class
-            else 0
-        )
-
-        # Calculate grid layout
-        self.cols, self.rows = self._calculate_grid_layout()
-
-        # Cache resized thumbnails and the composed grid so idle refreshes do not
-        # repeatedly decode and resize every class image.
-        self._thumbnail_cache: dict[Path, np.ndarray] = {}
-        self._grid_cache: np.ndarray | None = None
-        self._grid_dirty = True
-
-    def _calculate_grid_layout(self) -> tuple[int, int]:
-        """Calculate optimal grid layout based on number of classes."""
-        n = len(self.class_names)
-        if n <= 0:
-            return 1, 1
-
-        # Try to make a roughly square grid
-        import math
-
-        cols = int(math.ceil(math.sqrt(n)))
-        rows = int(math.ceil(n / cols))
-        return cols, rows
-
-    def _get_thumbnail(self, image_path: Path) -> np.ndarray | None:
-        """Load and resize an image once, then reuse the cached thumbnail."""
-        cached = self._thumbnail_cache.get(image_path)
-        if cached is not None:
-            return cached
-
-        if not image_path.exists():
-            return None
-
-        img = cv2.imread(str(image_path))
-        if img is None:
-            return None
-
-        h, w = img.shape[:2]
-        scale = min(self.tile_size / w, self.tile_size / h)
-        new_w = max(1, int(w * scale))
-        new_h = max(1, int(h * scale))
-        thumbnail = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-        self._thumbnail_cache[image_path] = thumbnail
-        return thumbnail
-
-    def _create_tile(
-        self, class_name: str, image_path: Path | None, index: int, total: int
-    ) -> np.ndarray:
-        """Create a single tile for a class."""
-        tile = np.zeros((self.tile_size, self.tile_size, 3), dtype=np.uint8)
-
-        if image_path is not None:
-            resized = self._get_thumbnail(image_path)
-            if resized is not None:
-                new_h, new_w = resized.shape[:2]
-
-                # Center in tile
-                x_offset = (self.tile_size - new_w) // 2
-                y_offset = (self.tile_size - new_h) // 2
-                tile[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = resized
-
-        # Draw label at top: "class_name (N/M)"
-        if image_path is not None:
-            label = f"{class_name} ({index + 1}/{total})"
-        else:
-            label = f"{class_name} (-/{total})"
-
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        thickness = 1
-        (label_w, label_h), baseline = cv2.getTextSize(
-            label, font, font_scale, thickness
-        )
-
-        # Semi-transparent background for label
-        overlay = tile.copy()
-        label_bg_height = label_h + baseline + 10
-        cv2.rectangle(overlay, (0, 0), (self.tile_size, label_bg_height), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.6, tile, 0.4, 0, tile)
-
-        cv2.putText(
-            tile,
-            label,
-            (5, label_h + 5),
-            font,
-            font_scale,
-            (255, 255, 255),
-            thickness,
-        )
-
-        # Draw thin border
-        border_end = self.tile_size - 1
-        cv2.rectangle(tile, (0, 0), (border_end, border_end), (80, 80, 80), 1)
-
-        return tile
-
-    def _compose_grid(self) -> np.ndarray:
-        """Compose all tiles into a single grid image."""
-        if not self._grid_dirty and self._grid_cache is not None:
-            return self._grid_cache
-
-        grid_h = self.rows * self.tile_size
-        grid_w = self.cols * self.tile_size
-        grid = np.zeros((grid_h, grid_w, 3), dtype=np.uint8)
-
-        for i, class_name in enumerate(self.class_names):
-            row = i // self.cols
-            col = i % self.cols
-
-            images = self.images_by_class[class_name]
-            total = len(images)
-
-            # Use global index - show black tile if class doesn't have this image
-            if self.current_index < total:
-                image_path = images[self.current_index]
-                display_index = self.current_index
-            else:
-                image_path = None
-                display_index = self.current_index
-
-            tile = self._create_tile(class_name, image_path, display_index, total)
-
-            y_start = row * self.tile_size
-            x_start = col * self.tile_size
-            y_end = y_start + self.tile_size
-            x_end = x_start + self.tile_size
-            grid[y_start:y_end, x_start:x_end] = tile
-
-        self._grid_cache = grid
-        self._grid_dirty = False
-        return grid
-
-    def _set_current_index(self, index: int) -> None:
-        """Update the global image index and invalidate the grid if it changed."""
-        if index != self.current_index:
-            self.current_index = index
-            self._grid_dirty = True
-
-    def _next_images(self) -> None:
-        """Advance to next image index."""
-        if self.max_images > 0:
-            self._set_current_index(min(self.current_index + 1, self.max_images - 1))
-
-    def _prev_images(self) -> None:
-        """Go back to previous image index."""
-        self._set_current_index(max(self.current_index - 1, 0))
-
-    def _reset_indices(self) -> None:
-        """Reset to first image."""
-        self._set_current_index(0)
-
-    def run(self) -> None:
-        """Run the interactive grid viewer."""
-        if not self.class_names:
-            console.print("[yellow]No classes to display.[/yellow]")
-            return
-
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-
-        while True:
-            # Compose and display grid
-            grid = self._compose_grid()
-            cv2.imshow(self.window_name, grid)
-
-            # Wait for input
-            key = cv2.waitKey(30) & 0xFF
-
-            # Handle keyboard input
-            if key == ord("q") or key == 27:  # Q or ESC
-                break
-            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
-                self._next_images()
-            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
-                self._prev_images()
-            elif key == ord("r"):  # R to reset
-                self._reset_indices()
-
-        cv2.destroyAllWindows()
-
-
-class _MaskViewer:
-    """Interactive viewer for semantic mask datasets with colored overlay."""
-
-    def __init__(
-        self,
-        image_paths: list[Path],
-        dataset: MaskDataset | COCODataset,
-        class_colors: dict[str, tuple[int, int, int]],
-        window_name: str,
         opacity: float = 0.5,
     ):
-        self.image_paths = image_paths
         self.dataset = dataset
-        self.class_colors = class_colors
-        self.window_name = window_name
         self.opacity = opacity
+        self.colors = _generate_class_colors(dataset.class_names)
+        self.classification = dataset.task == TaskType.CLASSIFICATION
+        self.mask_mode = isinstance(dataset, MaskDataset) or (
+            isinstance(dataset, COCODataset) and dataset.has_rle
+        )
+        self.groups: dict[str, list[int]] = {}
+        if self.classification:
+            view_split = split or (dataset.splits[0] if dataset.splits else None)
+            grouped = dataset.get_images_by_class(view_split)
+            self.image_paths: list[Path] = []
+            for name in dataset.class_names[:max_classes]:
+                paths = grouped.get(name, [])
+                start = len(self.image_paths)
+                self.image_paths.extend(paths)
+                self.groups[name] = list(range(start, len(self.image_paths)))
+        else:
+            self.image_paths = dataset.get_image_paths(split)
+        self.names = [path.name for path in self.image_paths]
+        self._areas: dict[int, float] = {}
+        # Bound decoded/encoded image memory and avoid idle refresh work.
+        self.image = lru_cache(maxsize=8)(self._image)
 
-        self.current_idx = 0
-        self.zoom = 1.0
-        self.pan_x = 0.0
-        self.pan_y = 0.0
+    def config(self) -> dict:
+        return {
+            "title": f"Argus — {self.dataset.path.name}",
+            "total": len(self.image_paths),
+            "classification": self.classification,
+            "classes": list(self.groups),
+            "sorts": ["filename"]
+            + ([] if self.classification or self.mask_mode else ["object_size"]),
+        }
 
-        # Mouse state for panning
-        self.dragging = False
-        self.drag_start_x = 0
-        self.drag_start_y = 0
-        self.pan_start_x = 0.0
-        self.pan_start_y = 0.0
-
-        # Current image cache
-        self.current_img: np.ndarray | None = None
-        self.overlay_img: np.ndarray | None = None
-
-        # Overlay visibility toggle
-        self.show_overlay = True
-
-        # Build class_id to color mapping
-        self._id_to_color: dict[int, tuple[int, int, int]] = {}
-        class_mapping = dataset.get_class_mapping()
-        for class_id, class_name in class_mapping.items():
-            if class_name in class_colors:
-                self._id_to_color[class_id] = class_colors[class_name]
-
-    def _load_current_image(self) -> bool:
-        """Load current image and create mask overlay."""
-        image_path = self.image_paths[self.current_idx]
-
-        img = cv2.imread(str(image_path))
-        if img is None:
-            return False
-
-        mask = self.dataset.load_mask(image_path)
-        if mask is None:
-            console.print(f"[yellow]Warning: No mask for {image_path}[/yellow]")
-            self.current_img = img
-            self.overlay_img = img.copy()
-            return True
-
-        # Validate dimensions
-        if img.shape[:2] != mask.shape[:2]:
-            console.print(
-                f"[red]Error: Dimension mismatch for {image_path.name}: "
-                f"image={img.shape[:2]}, mask={mask.shape[:2]}[/red]"
+    def _largest_bbox(self, image_id: int) -> float:
+        if image_id not in self._areas:
+            annotations = self.dataset.get_annotations_for_image(
+                self.image_paths[image_id]
             )
-            return False
+            self._areas[image_id] = max(
+                (
+                    max(0.0, ann["bbox"][2]) * max(0.0, ann["bbox"][3])
+                    for ann in annotations
+                    if ann.get("bbox")
+                ),
+                default=0.0,
+            )
+        return self._areas[image_id]
 
-        self.current_img = img
-        self.overlay_img = self._create_overlay(img, mask)
-        return True
+    def query(
+        self,
+        search: str = "",
+        sort: str = "filename",
+        descending: bool = False,
+        offset: int = 0,
+        limit: int = 1,
+    ) -> dict:
+        """Return one page; classification pages contain one image per class.
 
-    def _create_overlay(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Create colored overlay from mask.
-
-        Args:
-            img: Original image (BGR).
-            mask: Grayscale mask with class IDs.
-
-        Returns:
-            Image with colored mask overlay.
+        Object size is the largest bounding-box area in source pixels, including
+        polygon bounds. Images without boxes have area zero. Metadata is indexed
+        only when this sort is first selected, so opening large datasets is cheap.
         """
-        # Create colored mask
-        h, w = mask.shape
-        colored_mask = np.zeros((h, w, 3), dtype=np.uint8)
+        if sort not in self.config()["sorts"]:
+            raise ValueError("Unsupported sort field")
+        if offset < 0 or not 1 <= limit <= 100:
+            raise ValueError("Invalid page bounds")
 
-        for class_id, color in self._id_to_color.items():
-            colored_mask[mask == class_id] = color
+        def ordered(ids):
+            matches = [i for i in ids if search.casefold() in self.names[i].casefold()]
+            return sorted(
+                matches,
+                key=lambda i: (
+                    self._largest_bbox(i) if sort == "object_size" else 0,
+                    self.names[i].casefold(),
+                    i,
+                ),
+                reverse=descending,
+            )
 
-        # Blend with original image
-        # Ignore pixels are fully transparent (not blended)
-        ignore_mask = mask == self.dataset.ignore_index
-        alpha = np.ones((h, w, 1), dtype=np.float32) * self.opacity
-        alpha[ignore_mask] = 0.0
+        def item(i, class_name=None):
+            return {
+                "id": i,
+                "filename": self.names[i],
+                "class_name": class_name,
+                "object_size": self._areas.get(i),
+            }
 
-        # Blend: result = img * (1 - alpha) + colored_mask * alpha
-        blended = (
-            img.astype(np.float32) * (1 - alpha)
-            + colored_mask.astype(np.float32) * alpha
-        )
-        return blended.astype(np.uint8)
-
-    def _get_display_image(self) -> np.ndarray:
-        """Get the image transformed for current zoom/pan."""
-        if self.overlay_img is None:
-            return np.zeros((480, 640, 3), dtype=np.uint8)
-
-        if self.show_overlay:
-            img = self.overlay_img
-        elif self.current_img is not None:
-            img = self.current_img
+        if self.classification:
+            groups = {name: ordered(ids) for name, ids in self.groups.items()}
+            total = max((len(ids) for ids in groups.values()), default=0)
+            items = [
+                item(ids[offset], name)
+                if offset < len(ids)
+                else {"id": None, "class_name": name, "filename": "No image"}
+                for name, ids in groups.items()
+            ]
         else:
-            img = self.overlay_img
+            ids = ordered(range(len(self.image_paths)))
+            total = len(ids)
+            items = [item(i) for i in ids[offset : offset + limit]]
+        return {"items": items, "total": total, "offset": offset}
 
-        h, w = img.shape[:2]
-
-        if self.zoom == 1.0 and self.pan_x == 0.0 and self.pan_y == 0.0:
-            display = img.copy()
-        else:
-            # Calculate the visible region
-            view_w = int(w / self.zoom)
-            view_h = int(h / self.zoom)
-
-            # Center point with pan offset
-            cx = w / 2 + self.pan_x
-            cy = h / 2 + self.pan_y
-
-            # Calculate crop bounds
-            x1 = int(max(0, cx - view_w / 2))
-            y1 = int(max(0, cy - view_h / 2))
-            x2 = int(min(w, x1 + view_w))
-            y2 = int(min(h, y1 + view_h))
-
-            # Adjust if we hit boundaries
-            if x2 - x1 < view_w:
-                x1 = max(0, x2 - view_w)
-            if y2 - y1 < view_h:
-                y1 = max(0, y2 - view_h)
-
-            # Crop and resize
-            cropped = img[y1:y2, x1:x2]
-            display = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
-
-        # Add info overlay
-        image_path = self.image_paths[self.current_idx]
-        idx = self.current_idx + 1
-        total = len(self.image_paths)
-        info_text = f"[{idx}/{total}] {image_path.name}"
-        if self.zoom > 1.0:
-            info_text += f" (Zoom: {self.zoom:.1f}x)"
-        if not self.show_overlay:
-            info_text += " [Overlay: OFF]"
-
-        cv2.putText(
-            display,
-            info_text,
-            (10, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2,
-        )
-        cv2.putText(
-            display, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 1
-        )
-
-        return display
-
-    def _mouse_callback(
-        self, event: int, x: int, y: int, flags: int, param: None
-    ) -> None:
-        """Handle mouse events for zoom and pan."""
-        if event == cv2.EVENT_MOUSEWHEEL:
-            # Zoom in/out
-            if flags > 0:
-                self.zoom = min(10.0, self.zoom * 1.2)
-            else:
-                self.zoom = max(1.0, self.zoom / 1.2)
-
-            # Reset pan if zoomed out to 1x
-            if self.zoom == 1.0:
-                self.pan_x = 0.0
-                self.pan_y = 0.0
-
-        elif event == cv2.EVENT_LBUTTONDOWN:
-            self.dragging = True
-            self.drag_start_x = x
-            self.drag_start_y = y
-            self.pan_start_x = self.pan_x
-            self.pan_start_y = self.pan_y
-
-        elif event == cv2.EVENT_MOUSEMOVE and self.dragging:
-            if self.zoom > 1.0 and self.overlay_img is not None:
-                h, w = self.overlay_img.shape[:2]
-                # Calculate pan delta (inverted for natural feel)
-                dx = (self.drag_start_x - x) / self.zoom
-                dy = (self.drag_start_y - y) / self.zoom
-
-                # Update pan with limits
-                max_pan_x = w * (1 - 1 / self.zoom) / 2
-                max_pan_y = h * (1 - 1 / self.zoom) / 2
-
-                self.pan_x = max(-max_pan_x, min(max_pan_x, self.pan_start_x + dx))
-                self.pan_y = max(-max_pan_y, min(max_pan_y, self.pan_start_y + dy))
-
-        elif event == cv2.EVENT_LBUTTONUP:
-            self.dragging = False
-
-    def _reset_view(self) -> None:
-        """Reset zoom and pan to default."""
-        self.zoom = 1.0
-        self.pan_x = 0.0
-        self.pan_y = 0.0
-
-    def _next_image(self) -> None:
-        """Go to next image."""
-        self.current_idx = (self.current_idx + 1) % len(self.image_paths)
-        self._reset_view()
-
-    def _prev_image(self) -> None:
-        """Go to previous image."""
-        self.current_idx = (self.current_idx - 1) % len(self.image_paths)
-        self._reset_view()
-
-    def run(self) -> None:
-        """Run the interactive viewer."""
-        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
-        cv2.setMouseCallback(self.window_name, self._mouse_callback)
-
-        while True:
-            # Load image if needed
-            if self.overlay_img is None and not self._load_current_image():
-                console.print(
-                    f"[yellow]Warning: Could not load "
-                    f"{self.image_paths[self.current_idx]}[/yellow]"
+    def _image(self, image_id: int, annotations: bool = True) -> bytes:
+        if not 0 <= image_id < len(self.image_paths):
+            raise IndexError("Unknown image")
+        path = self.image_paths[image_id]
+        img = cv2.imread(str(path))
+        if img is None:
+            raise ValueError(f"Could not read image: {path.name}")
+        if annotations and self.mask_mode:
+            mask = self.dataset.load_mask(path)
+            if mask is not None:
+                if mask.shape != img.shape[:2]:
+                    raise ValueError(f"Image/mask dimensions differ: {path.name}")
+                colored = np.zeros_like(img)
+                valid = np.zeros(mask.shape, dtype=bool)
+                for class_id, name in self.dataset.get_class_mapping().items():
+                    if class_id == self.dataset.ignore_index:
+                        continue
+                    pixels = mask == class_id
+                    colored[pixels] = self.colors.get(name, (0, 255, 0))
+                    valid |= pixels
+                blended = cv2.addWeighted(
+                    img, 1 - self.opacity, colored, self.opacity, 0
                 )
-                self._next_image()
-                continue
+                img[valid] = blended[valid]
+        elif annotations and not self.classification:
+            img = _draw_annotations(
+                img, self.dataset.get_annotations_for_image(path), self.colors
+            )
+        ok, encoded = cv2.imencode(".png", img)
+        if not ok:
+            raise ValueError(f"Could not encode image: {path.name}")
+        return encoded.tobytes()
 
-            # Display image
-            display = self._get_display_image()
-            cv2.imshow(self.window_name, display)
+    def make_server(self, port: int = 0) -> ThreadingHTTPServer:
+        """Bind only to loopback with an unguessable, per-session URL prefix."""
+        viewer = self
+        prefix = "/" + secrets.token_urlsafe(24) + "/"
+        assets = {
+            "": ("index.html", "text/html; charset=utf-8"),
+            "viewer.js": ("viewer.js", "text/javascript; charset=utf-8"),
+            "viewer.css": ("viewer.css", "text/css; charset=utf-8"),
+        }
 
-            # Wait for input (short timeout for smooth panning)
-            key = cv2.waitKey(30) & 0xFF
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                pass
 
-            # Handle keyboard input
-            if key == ord("q") or key == 27:  # Q or ESC
-                break
-            elif key == ord("n") or key == 83 or key == 3:  # N or Right arrow
-                self.overlay_img = None
-                self._next_image()
-            elif key == ord("p") or key == 81 or key == 2:  # P or Left arrow
-                self.overlay_img = None
-                self._prev_image()
-            elif key == ord("r"):  # R to reset zoom
-                self._reset_view()
-            elif key == ord("t"):  # T to toggle overlay
-                self.show_overlay = not self.show_overlay
+            def respond(self, body: bytes, content_type: str, status=200):
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; script-src 'self'; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self'; "
+                    "frame-ancestors 'none'; base-uri 'none'",
+                )
+                self.end_headers()
+                self.wfile.write(body)
 
-        cv2.destroyAllWindows()
+            def do_GET(self):
+                url = urlsplit(self.path)
+                if not url.path.startswith(prefix):
+                    self.respond(b"Not found", "text/plain", 404)
+                    return
+                route = url.path[len(prefix) :]
+                params = parse_qs(url.query)
+
+                def param(name, default):
+                    return params.get(name, [default])[0]
+
+                try:
+                    if route in assets:
+                        name, content_type = assets[route]
+                        body = files("argus").joinpath("web", name).read_bytes()
+                        self.respond(body, content_type)
+                        return
+                    if route == "api/config":
+                        result = viewer.config()
+                    elif route == "api/images":
+                        result = viewer.query(
+                            search=param("search", ""),
+                            sort=param("sort", "filename"),
+                            descending=param("descending", "0") == "1",
+                            offset=int(param("offset", "0")),
+                            limit=int(param("limit", "1")),
+                        )
+                    elif route.startswith("api/image/"):
+                        image_id = int(route.removeprefix("api/image/"))
+                        body = viewer.image(image_id, param("annotations", "1") != "0")
+                        self.respond(body, "image/png")
+                        return
+                    else:
+                        self.respond(b"Not found", "text/plain", 404)
+                        return
+                    self.respond(json.dumps(result).encode(), "application/json")
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                except IndexError:
+                    self.respond(b"Unknown image", "text/plain", 404)
+                except (ValueError, OSError, cv2.error) as exc:
+                    # Keep dataset paths and decoder details out of HTTP errors.
+                    console.print(f"Viewer request failed: {exc}", markup=False)
+                    self.respond(b"Unable to load this request", "text/plain", 400)
+
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        server.viewer_url = f"http://127.0.0.1:{server.server_port}{prefix}"
+        return server
+
+    def run(self, port: int = 0, open_browser: bool = True) -> None:
+        with self.make_server(port) as server:
+            console.print(f"Viewer: {server.viewer_url}", markup=False)
+            console.print("Press Ctrl+C in this terminal to stop the viewer.")
+            if open_browser:
+                try:
+                    webbrowser.open(server.viewer_url)
+                except webbrowser.Error:
+                    console.print("Open the URL above in your browser.")
+            with suppress(KeyboardInterrupt):
+                server.serve_forever()
